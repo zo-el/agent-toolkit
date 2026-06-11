@@ -28,6 +28,6 @@ done
 ## Layout & lifecycle
 
 - One directory per skill under [`skills/`](skills/), each a single `SKILL.md` (frontmatter `name` + `description` — the description is the auto-trigger).
-- This repo lives inside the workshop checkout as an **untracked sibling** (workshop `.gitignore`) so it's visible in one IDE, but has its own git history — push it to GitHub whenever.
+- Home: [`zo-el/agent-toolkit`](https://github.com/zo-el/agent-toolkit). The working checkout lives inside the workshop as an **untracked sibling** (workshop `.gitignore`) so it's visible in one IDE — deliberately not a submodule: consumers are the `~/.claude/skills` symlinks, not any project's build, so a pin would only drift.
 - Division of labor: **global `~/.claude/CLAUDE.md`** holds always-on hard constraints (git rules), **these skills** hold procedures, **per-project docs** (written by `project-bootstrap`) hold each repo's visible contract.
 - Future: package as a Claude Code plugin if the set ever needs versioned distribution beyond symlinks.
