@@ -1,37 +1,35 @@
 ---
 name: project-bootstrap
-description: Scaffold a new project with the user's standard development contract — workflow docs, spec board, agent instructions. Use when starting a brand-new repo, or when the user asks to set up the workflow / documentation skeleton in an existing one.
+description: Scaffold a new project with the user's standard development contract — agent instructions, spec board, workflow pointers. Use when starting a brand-new repo, or when the user asks to set up the workflow / documentation skeleton in an existing one.
 ---
 
 # Project bootstrap
 
-Write the thin, repo-visible contract into a new project so collaborators, CI, and other agents see the same rules the skills enforce. Keep every file thin; **one home per rule** — repo docs state the contract, the `feature-*` skills carry the live procedure.
+Write the thin, repo-visible contract into a new project. The workflow **procedures** live in the agent-toolkit skills (`software-development` + the phase skills) — the repo carries only pointers plus its own specifics. **One home per rule.**
 
 ## Files to create
 
 ```
-CLAUDE.md                                # session disciplines + @AGENTS.md import
-AGENTS.md                                # project map: what the repo is, stack, build/test commands, structure facts
+CLAUDE.md                 # session disciplines + workflow pointer + @AGENTS.md import
+AGENTS.md                 # project map: what the repo is, stack, build/format/test commands, structure facts
 documentation/
-  DEVELOPMENT_WORKFLOW.md                # the 4-phase contract (outline below)
-  SPEC_DISCIPLINE.md                     # Phase 1 detail (mirror the feature-spec skill, repo-visible)
-  README.md                              # the spec board: an aligned table of specs/<feature> → status
-  specs/                                 # empty; features land here
+  README.md               # the spec board: an aligned table of specs/<feature> → status, plus the repo's spec rules
+  specs/                  # empty; features land here
 ```
 
 ## CLAUDE.md must state
 
-- The workflow trigger: the moment a session turns to building/changing a feature, the workflow starts at Phase 1 — detected from conversation, never prompted for.
-- State-mutation approval: per-action approval for git commits/pushes/rebases, user/system config edits, and destructive fs ops; in-repo edits, builds, and tests allowed by default.
-- Documentation discipline: no unsolicited `.md` files; spec/milestone deliverables are the carve-out; markdown per the `doc-style` skill (one paragraph = one line, aligned tables).
+- **The workflow pointer:** the moment a session turns to building/changing a feature, follow the agent-toolkit `software-development` skill, starting at Phase 1 — detected from conversation, never prompted for. Spec style per `feature-spec`; docs per `doc-style`.
+- **For non-Claude agents/humans:** the skills are plain markdown — include the toolkit clone command (`git clone git@github.com:zo-el/agent-toolkit.git`).
+- **State-mutation approval:** per-action approval for git commits/pushes/rebases, user/system config edits, and destructive fs ops; in-repo edits, builds, and tests allowed by default. Never push to a remote; never add AI attribution to commits or PRs.
+- **Documentation discipline:** no unsolicited `.md` files; spec/milestone deliverables are the carve-out.
 - Any stack-specific session rules (e.g. "commands run inside `nix develop -c`" for flake repos).
 
-## DEVELOPMENT_WORKFLOW.md outline
+## documentation/README.md (the board) must state
 
-- **Phase 1 — Spec:** feature folder under `documentation/specs/<feature>/`; decisions-only component docs; no status; speccing touches only specs. Detail in `SPEC_DISCIPLINE.md`.
-- **Phase 2 — Planning:** `milestones/` catalog; self-contained milestones numbered by build order; outcome ACs (testable, 3–7, edge cases, no implementation detail); implementation as real-code diff blocks; test plan mapped to ACs.
-- **Phase 3 — Development:** 3a implement (+unit tests) → 3b test (every available check) → 3c review (`/code-review`, triage, loop until clean).
-- **Phase 4 — Finalize:** final review vs AC, changelog, branch + PR per repo with AC as body, post-merge spec sync, delete the shipped milestone. Phases 3–4 are the uniform Definition of Done; milestones never restate it.
+- The specs index table (feature → status, pipe-aligned).
+- Where specs and milestones live (`specs/<feature>/` + `milestones/`), one line each on what they are.
+- Any repo-specific spec rules (e.g. citation rooting conventions, cross-repo sync expectations for multi-repo projects).
 
 ## Procedure
 
