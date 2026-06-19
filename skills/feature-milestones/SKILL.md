@@ -9,9 +9,9 @@ Planning breaks the spec into ordered, self-contained milestones in `documentati
 
 ## The catalog
 
-- The `milestones/` directory **is** the catalog: the Status line separates open from completed; no separate index to sync. A completed milestone stays as a historical reference (`Status: completed` — as-built truth lives in the spec docs) until the feature ships; the set is deleted together once every milestone is implemented.
+- The `milestones/` directory **is** the catalog: the Status line separates open from completed; no separate index to sync. A completed milestone stays as a historical reference (`Status: completed` — as-built truth lives in the spec docs) until the feature ships, and is **frozen the moment it completes** — never edited again, so it carries no pointer to live or other work; the set is deleted together once every milestone is implemented.
 - Numbered by build order; reorder/renumber/remove freely while open (use plain `mv`, never commit without approval).
-- **Self-contained:** nothing points at a milestone — not specs, not code, not siblings. Need something an earlier milestone produces? State it as a **precondition in your own words**.
+- **Self-contained, both directions:** nothing points at a milestone (not specs, not code, not siblings), **and** a milestone points at no other file for its work or status — no "open work in B<NN>", no "see milestone 03". Need something an earlier milestone produces, or to record follow-up / out-of-scope work? State it as a **precondition or note in your own words**, never a pointer to another file.
 - One coherent outcome per milestone; parallel work stays inside one milestone as sections under a single AC set.
 
 ## Two-stage planning
