@@ -26,7 +26,7 @@ done
 
 ## Install (per machine)
 
-Symlink each skill so Claude Code discovers them, and point the device's global `CLAUDE.md` at the toolkit — that import chain pulls in `core.md` automatically, so the always-on principles need no symlink:
+Symlink each skill so Claude Code discovers them, point the device's global `CLAUDE.md` at the toolkit (that import chain pulls in `core.md`, so the always-on principles need no symlink), and provision the `skill-creator` plugin:
 
 ```bash
 # symlink every skill — re-run any time to pick up new or renamed ones
@@ -35,6 +35,9 @@ for d in "$(pwd)"/skills/*/; do
 done
 # drop symlinks whose target was removed (e.g. after a merge or rename)
 find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete
+
+# provision the skill-creator plugin (the skill-authoring skill uses it to test/tune skills)
+command -v claude >/dev/null && claude plugin install skill-creator@claude-plugins-official --scope user
 
 cat > ~/.claude/CLAUDE.md <<DONE
 # Global instructions
