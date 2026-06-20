@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: Track and groom the project backlog — one file per item under documentation/backlog/, with the add/triage/sweep protocol. Use when filing a follow-up that surfaces mid-session, when the user asks what's next, or when a sweep is due (finalize, on demand, or the cap is hit).
+description: Track and groom the project backlog (one file per item under documentation/backlog/, add/triage/sweep protocol). Use when a follow-up or "we should do X later" surfaces mid-session, when the user asks what's next or what's on the backlog, or when a sweep is due (at finalize, on demand, or when the cap is hit).
 ---
 
 # Backlog
@@ -32,13 +32,15 @@ The backlog is the project's queue of known-but-unscheduled work. It must never 
 ## Adding (triage at the door)
 
 - If it's fixable in **under ~15 minutes** in the session that surfaced it, fix it — don't file it.
+- **Feature-tied deferred work isn't a backlog item — yet.** "Do X once feature/milestone Y ships or finalizes" stays a note in Y's milestone (its **Anything else** / out-of-scope section), where develop → finalize owns it. It becomes a backlog item only once Y is **completed** and the work is still pending.
+- **Deployment-surfaced issues belong to the deploy, not the backlog.** A rejected token, a dark fleet metric, a failing health check that shows up during/after a deploy is fixed in the deploy work — the runbook owns "deployment works" and verifies it before declaring done. Parking it as backlog means the release shipped incomplete.
 - Every new item gets a **Priority at creation**: P0 = blocks releases or correctness; P1 = real recurring friction; P2 = nice-to-have.
 - Cite the `Source` (session/plan/review that surfaced it) and end the notes with the concrete next action.
 - **Hard cap on open items (default 20):** adding one past the cap requires running a sweep first.
 
 ## The sweep (the cleanup protocol)
 
-Runs (a) at every feature **finalize** (Phase 4 bookkeeping), (b) on demand ("sweep the backlog"), (c) forced when the cap is hit. For **every** open item, verify against the current code/specs — never against memory:
+Runs (a) at every **finalize** (the `develop` skill's Ship step), (b) on demand ("sweep the backlog"), (c) forced when the cap is hit. For **every** open item, verify against the current code/specs — never against memory:
 
 - **Resolved** (the code/doc now does it) → delete, one-line note in the commit.
 - **No longer applies** (superseded, design moved on) → delete, with the reason.

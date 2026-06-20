@@ -20,9 +20,10 @@ documentation/specs/<feature>/
 
 ## Component doc rules
 
+Prose and formatting follow the `documentation-style` skill; these are the spec-specific rules on top.
+
 - State the **expected end-state** as standing truth — what the component is meant to do, the contract it exposes.
-- **Decisions, not explanations** — short, clear decision points, not surrounding prose; no speculation, no option-shopping.
-- **Code shapes get their own fenced block** — types, externs, payloads, endpoints as rough code (```rust / ```ts / ```json — the expected shape, not pasted implementation) followed by a one-line note of intent.
+- **Code shapes are the expected shape, not the implementation** — types, externs, payloads, endpoints as rough code with a one-line note of intent; never paste real code.
 - **No status** — no `Status:` headers, no Implemented/Planned/Delta sections; milestones carry status.
 - Cite existing code as `path:line` (with a `**Paths relative to:**` header line); don't paste it.
 - Error/edge behavior is part of the contract: response variants, failure modes, and trust/threat notes are decisions too.
@@ -31,6 +32,5 @@ documentation/specs/<feature>/
 
 - **Speccing touches only the specs** — never update milestones, code, or other docs to match a revised spec; reconciling them is Phase 2 work.
 - **Ripple every decision change through the whole spec folder in the same pass** — diagrams, error tables, naming, sibling docs. Grep the folder for stale terms before finishing (renamed functions, removed fields, dead error codes).
-- **One home per rule** — a fact lives in exactly one doc; siblings link to it, never restate it.
 - **Keep specs and code in sync** — when later code changes alter documented behavior, the matching spec doc updates in the same change.
-- Review substantial spec work with the `plannotator-loop` skill; format everything per the `doc-style` skill.
+- Review substantial spec work with the `plannotator-loop` skill.

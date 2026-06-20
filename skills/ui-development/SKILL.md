@@ -1,9 +1,9 @@
 ---
-name: ui-review-loop
-description: Screenshot-gallery review loop for UI work — specs declare visual beats, an env-gated snap() saves a numbered gallery of the real app, the agent self-reviews the shots, then the user reviews and requests changes. Use whenever building or changing UI the user will want to see (any framework with a driveable app + screenshot API).
+name: ui-development
+description: The UI development loop — build or change UI, then produce a numbered screenshot gallery of the real app (env-gated snap()), self-review every shot, hand it to the user, and regenerate per round until clean. Use whenever building, changing, or styling any UI, front-end, screen, view, or component the user will want to see.
 ---
 
-# UI review loop (screenshot galleries)
+# UI development loop (screenshot galleries)
 
 The user reviews UI from **screenshots of the real app**, not from live runs or prose descriptions. The loop: build → drive the journey in a spec that declares its visual beats → generate the gallery → **self-review every shot** → hand the gallery over → apply feedback → regenerate. Repeat until a round comes back clean. One artifact serves three purposes: regression test, review material, living documentation of every UI state.
 

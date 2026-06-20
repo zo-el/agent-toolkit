@@ -1,6 +1,6 @@
 ---
 name: chore
-description: File and run a chore — maintenance work (managing, monitoring, migrating, rotating, config sweeps) on the running system, tracked as one execution doc per item under documentation/chores/ and deleted when it ships. Distinct from a feature (a new function of the Unyt network) and from the backlog (non-urgent, spare-time work).
+description: Run maintenance on the running system — a migration, credential/account rotation, dependency bump, config or rename sweep, infra cutover, or monitoring task. Use the moment such maintenance starts — tracked as one execution doc under documentation/chores/, deleted when it ships. (A new network function is a feature; deferrable spare-time work is backlog.)
 ---
 
 # Chore
