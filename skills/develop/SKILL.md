@@ -15,6 +15,7 @@ The loop for building or changing a unit of code in any track: Build → Test �
 ## Test
 
 - Run every check the environment allows — unit tests, typecheck, format, lint — and regression-check the existing tests. Respect repo conventions (e.g. run inside `nix develop -c` when the repo has a flake). Before declaring a heavy tier (e.g. a real-app UI suite) out of reach, actually try it — toolchains, displays, and drivers are usually present; only hand the user a command you genuinely cannot run.
+- **A gate that can't run in this environment** (a broken toolchain, or one needing credentials or a live system) is *not* a pass: say so explicitly, run the gates you **can** (e.g. `fmt`), and rely on CI and the `/code-review` gate as the real check — never report a CI-only result as locally verified.
 - Add the edge-case tests the implementation didn't handle, at the repo's established test tiers.
 - **UI work follows the `ui-development` skill:** the journey spec declares visual beats, an env-gated `snap()` produces a numbered screenshot gallery of the real app, you self-review every shot, then the user reviews from the gallery and requests changes — regenerate per round until clean.
 - All CI tests pass before review.
