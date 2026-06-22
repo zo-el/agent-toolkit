@@ -40,16 +40,17 @@ The backlog is the project's queue of known-but-unscheduled work. It must never 
 
 ## The sweep (the cleanup protocol)
 
-Runs (a) at every **finalize** (the `develop` skill's Ship step), (b) on demand ("sweep the backlog"), (c) forced when the cap is hit. For **every** open item, verify against the current code/specs — never against memory:
+Runs (a) at every **finalize** (the `develop` skill's Ship step), (b) on demand ("sweep the backlog"), (c) forced when the cap is hit. One item at a time: verify it against the current code/specs (never memory), then take the disposition it earns. Execute the clear-cut ones; for anything needing a product / UX / scope call, present it with a recommendation and let the user decide.
 
 - **Resolved** (the code/doc now does it) → delete, one-line note in the commit.
 - **No longer applies** (superseded, design moved on) → delete, with the reason.
-- **Became real work** → it graduates into a feature's spec/milestones and the file is deleted — one home, no double-tracking.
-- **Still valid** → refresh stale notes (dead paths, changed names) and re-check Priority.
+- **Owned by an active workflow** (a feature's milestones, a deploy, a Holochain upgrade) → fold the concern into that workflow's permanent home — a milestone note, the deploy runbook, the relevant skill — fix any dangling reference, then delete. (Inverse of the "Adding" rule: deferred work *becomes* a backlog item only once its workflow completes.)
+- **Actionable now** (a clear, agent-owned fix) → fix it via the `develop` loop (build → verify → commit), then delete — don't just re-file it.
+- **Still valid but can't act yet** (gated on production, user-owned) → refresh stale notes (dead paths, changed names), re-check Priority, keep.
 - **Recurrence ladder:** an item that has bitten 3+ times is promoted one priority level — recurring friction is never P2.
 - **P0 exit rule:** no P0 leaves a sweep unscheduled — it becomes immediate work, milestone work, or is explicitly demoted with a written reason.
 
-End each sweep by reporting: deleted (with reasons), promoted, re-prioritized, and the open count vs. the cap.
+End each sweep by reporting: deleted (with reasons), folded into a workflow, fixed, promoted/re-prioritized, and the open count vs. the cap.
 
 ## Unattended pass (a batch run the user triggers, e.g. overnight)
 
