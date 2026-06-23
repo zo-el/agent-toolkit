@@ -1,6 +1,6 @@
 ---
 name: documentation-style
-description: How written output should read, by type — code comments, markdown, READMEs, changelogs, commit messages. Use whenever writing or editing any code comment, markdown file, doc, README, spec, changelog, or commit message; apply the section for the type you're writing. Beyond what rustfmt / prettier / linters enforce.
+description: How written output should read, by type — code comments, markdown, READMEs, changelogs, commit messages, tracker descriptions. Use whenever writing or editing any code comment, markdown file, doc, README, spec, changelog, commit message, or tracker/issue/milestone description (e.g. Linear); apply the section for the type you're writing. Beyond what rustfmt / prettier / linters enforce.
 ---
 
 # Documentation style
@@ -49,3 +49,8 @@ def align(rows, indent=""):
 
 - **One short line** — a concise summary of the change in [Conventional Commits](https://www.conventionalcommits.org) form (`feat:` / `fix:` / `chore(scope):`). The diff is the detail.
 - Add a body only when the change genuinely needs a why or a warning — the same bar as expanding a changelog entry (rare).
+
+## Tracker descriptions (Linear issues, milestones, tickets)
+
+- **Short, precise bullet points — never prose.** A milestone or issue description is a few crisp points stating what the thing delivers, in the tracker's own terse voice. Put detail only where it's genuinely expected — an **issue's acceptance criteria**, not a milestone's blurb.
+- **Don't narrate what the tool's structure already conveys.** Views, names, labels, and parent/child links carry the relationships — so no "this milestone spans projects X/Y via label Z," no restating the hierarchy in words. Name and label it well; let the view do the rest.
