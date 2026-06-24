@@ -15,7 +15,7 @@ A chore is **maintenance — managing, monitoring, migrating, or fixing what alr
 
 - One file per chore under `documentation/chores/`: `C<NN>-<short-slug>.md`. The **directory is the catalog** — `ls` is the list.
 - A chore file exists only while the work is unfinished — **its existence is the status**. On ship, **delete it** (git history is the archive); no status field, no "done" section.
-- **Self-contained** — never cross-reference another chore, spec, milestone, or backlog item; state shared context in its own words.
+- **Self-contained** — never cross-reference another chore, spec, task, or backlog item; state shared context in its own words.
 - IDs are append-only; bump the one-line counter in `documentation/chores/README.md` when you add one.
 
 ## Item shape

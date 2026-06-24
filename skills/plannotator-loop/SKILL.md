@@ -1,6 +1,6 @@
 ---
 name: plannotator-loop
-description: Iterative review of a plan, spec, milestone, or other document via Plannotator — open the artifact, address every annotation, reopen, repeat until a round returns clean. Use when the user wants to review or iterate on a document, asks for back-and-forth feedback rounds, or right after you produce a substantial spec/plan/milestone.
+description: Iterative review of a plan, spec, task, or other document via Plannotator — open the artifact, address every annotation, reopen, repeat until a round returns clean. Use when the user wants to review or iterate on a document, asks for back-and-forth feedback rounds, or right after you produce a substantial spec/plan/task.
 ---
 
 # Plannotator review loop

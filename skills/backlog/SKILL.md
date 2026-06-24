@@ -32,7 +32,7 @@ The backlog is the project's queue of known-but-unscheduled work. It must never 
 ## Adding (triage at the door)
 
 - If it's fixable in **under ~15 minutes** in the session that surfaced it, fix it — don't file it.
-- **Feature-tied deferred work isn't a backlog item — yet.** "Do X once feature/milestone Y ships or finalizes" stays a note in Y's milestone (its **Anything else** / out-of-scope section), where develop → finalize owns it. It becomes a backlog item only once Y is **completed** and the work is still pending.
+- **Feature-tied deferred work isn't a backlog item — yet.** "Do X once feature/task Y ships or finalizes" stays a note in Y's task (its **Anything else** / out-of-scope section), where develop → finalize owns it. It becomes a backlog item only once Y is **completed** and the work is still pending.
 - **Deployment-surfaced issues belong to the deploy, not the backlog.** A rejected token, a dark fleet metric, a failing health check that shows up during/after a deploy is fixed in the deploy work — the runbook owns "deployment works" and verifies it before declaring done. Parking it as backlog means the release shipped incomplete.
 - Every new item gets a **Priority at creation**: P0 = blocks releases or correctness; P1 = real recurring friction; P2 = nice-to-have.
 - Cite the `Source` (session/plan/review that surfaced it) and end the notes with the concrete next action.
@@ -44,11 +44,11 @@ Runs (a) at every **finalize** (the `develop` skill's Ship step), (b) on demand 
 
 - **Resolved** (the code/doc now does it) → delete, one-line note in the commit.
 - **No longer applies** (superseded, design moved on) → delete, with the reason.
-- **Owned by an active workflow** (a feature's milestones, a deploy, a Holochain upgrade) → fold the concern into that workflow's permanent home — a milestone note, the deploy runbook, the relevant skill — fix any dangling reference, then delete. (Inverse of the "Adding" rule: deferred work *becomes* a backlog item only once its workflow completes.)
+- **Owned by an active workflow** (a feature's tasks, a deploy, a Holochain upgrade) → fold the concern into that workflow's permanent home — a task note, the deploy runbook, the relevant skill — fix any dangling reference, then delete. (Inverse of the "Adding" rule: deferred work *becomes* a backlog item only once its workflow completes.)
 - **Actionable now** (a clear, agent-owned fix) → fix it via the `develop` loop (build → verify → commit), then delete — don't just re-file it.
 - **Still valid but can't act yet** (gated on production, user-owned) → refresh stale notes (dead paths, changed names), re-check Priority, keep.
 - **Recurrence ladder:** an item that has bitten 3+ times is promoted one priority level — recurring friction is never P2.
-- **P0 exit rule:** no P0 leaves a sweep unscheduled — it becomes immediate work, milestone work, or is explicitly demoted with a written reason.
+- **P0 exit rule:** no P0 leaves a sweep unscheduled — it becomes immediate work, task work, or is explicitly demoted with a written reason.
 
 End each sweep by reporting: deleted (with reasons), folded into a workflow, fixed, promoted/re-prioritized, and the open count vs. the cap.
 
@@ -60,7 +60,7 @@ When the user asks to plan a batch of backlog work to run unattended, select and
 
 - **Agent-owned** — never items waiting on the user's input, access, or a state-mutating call only they can approve.
 - **Self-contained + test-verifiable** — a clear next action whose result a test suite can confirm; items with tests already pinning the buggy behavior are the best picks.
-- **Collision-free** — touches no files/areas owned by in-flight milestone work (uncommitted milestone changes in the same repo are fine only when the file sets are disjoint).
+- **Collision-free** — touches no files/areas owned by in-flight task work (uncommitted task changes in the same repo are fine only when the file sets are disjoint).
 - **Bounded** — mechanical fixes and audits over open-ended investigations; long-running/uncertain spelunking is a poor unattended fit.
 
 **Run protocol:**

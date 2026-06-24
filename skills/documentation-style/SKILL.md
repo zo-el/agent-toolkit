@@ -23,7 +23,7 @@ Readable directly as **raw `.md`** — read in editors and terminals as often as
 - **Tables: align the pipes** — pad every cell to its column's width; separator-row dashes span the column. Generate the alignment with a small script (don't hand-pad — it drifts) and verify all lines are equal length. Order rows by relevance (e.g. in-progress before done).
 - **Anything code-shaped goes in its own fenced block** with the right language tag and a one-line note of what it's meant to do; changes to existing code as ```diff blocks with explicit +/- lines and unchanged context kept.
 - **Status markers** — `[x]`/`[ ]` checkboxes, with a state emoji after an empty bracket when useful; emojis indicate state, never feelings; keep docs professional.
-- **No unsolicited docs** — don't create `.md` files or expand docs unless asked; no breadcrumbs; the carve-out is workflow deliverables (specs, milestones).
+- **No unsolicited docs** — don't create `.md` files or expand docs unless asked; no breadcrumbs; the carve-out is workflow deliverables (specs, tasks).
 
 ### Table alignment helper
 
@@ -54,3 +54,4 @@ def align(rows, indent=""):
 
 - **Short, precise bullet points — never prose.** A milestone or issue description is a few crisp points stating what the thing delivers, in the tracker's own terse voice. Put detail only where it's genuinely expected — an **issue's acceptance criteria**, not a milestone's blurb.
 - **Don't narrate what the tool's structure already conveys.** Views, names, labels, and parent/child links carry the relationships — so no "this milestone spans projects X/Y via label Z," no restating the hierarchy in words. Name and label it well; let the view do the rest.
+- **Write for the non-technical reader, faithful to the source.** Title and AC should let someone with no context grasp *what it does and where it's at* — plain words, no internal identifiers, paths, or commands (those stay in the repo docs). Simplify the wording, never the meaning: each criterion stays a faithful paraphrase of its source spec/task — same set of checks, just readable.

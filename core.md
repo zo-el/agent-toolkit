@@ -11,7 +11,7 @@ Always on — loaded every session, applying to every task: writing code, fixing
 - **Verify against reality, not memory.** Check the actual code and current state before acting or claiming — never trust stale docs, comments, or recollection.
 - **Surface, don't bury.** Flag the issues you spot and the decisions you defer — in the work and to the user. Never hide a shortcut.
 - **Sweep on rename.** When you remove or rename something, fix every reference to the old form in the same change — grep the whole repo, and **name any gitignored paths (untracked siblings, vendored or build dirs) explicitly, since an ignore-respecting search skips them**. Leave no dangling pointer.
-- **One home, and point only to permanent ones.** Every fact lives in exactly one place — never duplicated. Link to that home instead of restating it *only when the home is permanent* (a README, a spec). **Never point to a temporary artifact** — milestones, chores, and backlog items are deleted when the work ships, so a pointer to them is a future dangling reference. Temporary artifacts are self-contained: they carry their own context in their own words, and nothing points at them.
+- **One home, and point only to permanent ones.** Every fact lives in exactly one place — never duplicated. Link to that home instead of restating it *only when the home is permanent* (a README, a spec). **Never point to a temporary artifact** — tasks, chores, and backlog items are deleted when the work ships, so a pointer to them is a future dangling reference. Temporary artifacts are self-contained: they carry their own context in their own words, and nothing points at them.
 
 ## Guardrails
 
