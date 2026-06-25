@@ -26,15 +26,11 @@ done
 
 ## Install (per machine)
 
-Symlink each skill so Claude Code discovers them, point the device's global `CLAUDE.md` at the toolkit (that import chain pulls in `core.md`, so the always-on principles need no symlink), and provision the `skill-creator` plugin:
+Symlink each skill so Claude Code discovers them, point the device's global `CLAUDE.md` at the toolkit (that import chain pulls in `core.md`, so the always-on principles need no symlink), provision the `skill-creator` plugin, and register the auto-sync hooks (below) so the install never drifts:
 
 ```bash
-# symlink every skill — re-run any time to pick up new or renamed ones
-for d in "$(pwd)"/skills/*/; do
-  ln -sfn "$d" ~/.claude/skills/"$(basename "$d")"
-done
-# drop symlinks whose target was removed (e.g. after a merge or rename)
-find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete
+# symlink every skill into ~/.claude/skills (idempotent — re-run any time)
+./install-skills.sh
 
 # provision the skill-creator plugin (the skill-authoring skill uses it to test/tune skills)
 command -v claude >/dev/null && claude plugin install skill-creator@claude-plugins-official --scope user
@@ -46,6 +42,21 @@ All always-apply rules live in the portable agent-toolkit (its own git repo) —
 
 @$(pwd)/CLAUDE.md
 DONE
+```
+
+**Stay synced automatically.** [`install-skills.sh`](install-skills.sh) is idempotent — wire it into Claude Code hooks in `~/.claude/settings.json` so the install can never go stale: `SessionStart` re-syncs at the start of every session (picking up skills added, renamed, or removed — even by a `git pull` on another machine), and `PostToolUse` re-syncs after an edit so a mid-session skill add registers immediately. Point both at this checkout's absolute path to the script:
+
+```json
+"hooks": {
+  "SessionStart": [
+    { "matcher": "startup|resume|clear",
+      "hooks": [ { "type": "command", "command": "/abs/path/to/agent-toolkit/install-skills.sh > /dev/null 2>&1 || true" } ] }
+  ],
+  "PostToolUse": [
+    { "matcher": "Write|Edit",
+      "hooks": [ { "type": "command", "command": "/abs/path/to/agent-toolkit/install-skills.sh > /dev/null 2>&1 || true" } ] }
+  ]
+}
 ```
 
 ## Layout & lifecycle
