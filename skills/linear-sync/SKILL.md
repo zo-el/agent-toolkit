@@ -33,8 +33,16 @@ Before any Linear write, resolve **this project's Linear binding** — a `## Lin
 ## Mapping — ownership, not duplication
 
 - Each task → an issue in **the project that owns that work**; **shared machinery many services merely *use* lives once**, in the project that owns it — never a task per consumer.
-- **Area → the binding's existing labels**; **type → Feature / Bug / Improvement**; **weight → the team's estimate**, by scope; **priority only for the high ones**; **cycle + assignee** left to the user.
+- **Area → the binding's existing labels**; **type → Feature / Bug / Improvement**; **weight → the team's estimate**, by scope; **priority only for the high ones**; **cycle** by the cycle rule below; **assignee** left to the user.
 - **Status** (binding's state names): planned → Backlog/Ready · building → In Progress · in review → In-Review/Test · shipped → Done · dropped → Canceled.
+
+## Cycles — the cycle is each task's *planned* week
+
+When the team runs cycles, set every issue's cycle to the **week it's planned to land**, so the cycles read as the round's roadmap — never use the current cycle as a catch-all for already-done or in-flight work.
+
+- Lay the round's tasks out in **build order** (prerequisites first) and **spread them across the cycles** from the round's start to the cycle containing the milestone's `targetDate`, balanced by **estimate** (roughly even points per cycle — a small round may be one task a cycle, a fast multi-dev one several). The last task lands in the deadline cycle; if even that won't hold the spread, **flag over-commitment** rather than cramming past it. (Don't pin a fixed per-cycle budget — the deadline + the round's size set the pace.)
+- Apply this to **every** task regardless of status: a **completed** task sits in its planned cycle and simply reads as *done early* if it beat its slot; an **in-flight** task sits in its planned cycle too. Don't relocate done/started work into the current sprint.
+- Sets the **cycle** only; assignee + priority stay the user's. Resolve cycle dates via `list_cycles` against the milestone's `targetDate`; a re-sync re-runs this for the whole round.
 
 ## The link — glanceable both ways, and the dedup key
 
@@ -44,6 +52,7 @@ Before any Linear write, resolve **this project's Linear binding** — a `## Lin
 
 ## Discipline
 
+- **Local task first — never Linear-first.** Every Linear issue mirrors a task that already exists locally (`specs/<feature>/tasks/NN-*.md`, or the round's parent). **Never create or update a Linear issue without its local task existing first** — the repo is the plan's source of truth, so a Linear-only issue is invisible to anyone reading the local copies and gets lost. About to write to Linear with no local home? Stop, create the local task, then mirror.
 - **Outward-facing — approve before writing.** At each gate show the planned create/update (title, milestone, parent, status, labels, weight) and get an OK. Reads are free.
 - **Gates:** a round reaches `ready` → create milestone + parent + task-issues · build-start → pull AC + comments and reconcile · status flips → update · `develop` Ship → move to Done + paste the as-built plan as a comment.
 - **MCP gotchas:** `save_milestone` rename only applies when a `description` is passed in the same call; a large parallel `save_issue` batch can silently drop its first calls — verify each result's `updatedAt` / `parentId` and retry any that didn't take.
