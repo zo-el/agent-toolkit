@@ -8,9 +8,13 @@ skills_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/skills" && pwd)"
 dest="$HOME/.claude/skills"
 mkdir -p "$dest"
 
-# -sfn: replace an existing link and don't descend into a linked dir, so a
-# renamed skill repoints cleanly instead of nesting under the old link.
-for d in "$skills_dir"/*/; do
+# Symlink every skill — any dir containing a SKILL.md, at ANY depth. Skills are
+# grouped into caps/ owned/ cross-cutting/ subfolders for legibility but land
+# flat in ~/.claude/skills so Claude discovers them; basenames are unique across
+# the tree. -sfn: replace an existing link and don't descend into a linked dir,
+# so a moved/renamed skill repoints cleanly instead of nesting under the old link.
+find "$skills_dir" -name SKILL.md -print0 | while IFS= read -r -d '' f; do
+  d="$(dirname "$f")"
   ln -sfn "$d" "$dest/$(basename "$d")"
 done
 
