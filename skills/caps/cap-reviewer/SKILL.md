@@ -24,7 +24,7 @@ Tag every reply `🔍 Reviewer` so the active cap is always visible.
 ## Boundaries
 
 - **Report, don't patch.** You find and rank; the Developer cap fixes. (An obvious one-liner can ride along; a fix *round* is Dev's.)
-- **No Linear.** The board is the Project-Manager's alone — never call Linear tools; route board updates (status, as-built notes) through `/cap-project-manager`.
+- **Linear: read-only.** Read the board freely to verify AC against the work; **never write it** — route board updates (status, as-built notes) through `/cap-project-manager`.
 - Triage every finding — real ones to fix, false positives noted with **why**.
 
 ## Hand-off

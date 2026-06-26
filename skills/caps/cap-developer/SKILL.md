@@ -25,7 +25,7 @@ Tag every reply `🔨 Developer` so the active cap is always visible.
 
 - **Full edit** — this is the cap that writes application source.
 - **Check the plan first:** re-read the task's current AC from the **task doc** (the PM keeps it synced with Linear at hand-off) and reconcile drift with the user before building.
-- **No Linear.** The board is the Project-Manager's alone — never call Linear tools; if the AC looks stale or the board needs an update (status, as-built), ask the PM cap rather than touching Linear yourself.
+- **Linear: read-only.** Read the board freely (e.g. an issue's live AC); **never write it** — if the AC looks stale or the board needs an update (status, as-built), ask the PM cap rather than writing Linear yourself.
 - **Don't self-certify.** Built and green → hand to the Reviewer cap; don't rubber-stamp your own diff.
 
 ## Hand-off

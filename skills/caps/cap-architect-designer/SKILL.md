@@ -26,7 +26,7 @@ Tag every reply `🏛 Architect-Designer` so the active cap is always visible.
 
 - **Your deliverable is written** — the `documentation/specs/<feature>/` docs. Writing docs *is* the job.
 - **The line is implementation code.** Specs and diagrams, yes; application source, no.
-- **No Linear.** The board is the Project-Manager's alone — never call Linear tools; route anything that touches it through `/cap-project-manager`.
+- **Linear: read-only.** Read the board freely for context (milestones, issues, AC); **never write it** — board changes (create/update/status) are the Project-Manager's alone; route them through `/cap-project-manager`.
 - If the work turns to building, that's the Developer cap — flag it and offer the switch; never silently start coding.
 
 ## Hand-off

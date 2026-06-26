@@ -24,7 +24,7 @@ Natural flow: `/cap-architect-designer` → `/cap-project-manager` → `/cap-dev
 
 ## Tool boundaries
 
-- **Linear (the board) is Project-Manager-only — read *and* write.** Every other cap, and bare mode, routes board work through `/cap-project-manager`; the Developer reads task AC from the task doc the PM keeps synced, not from Linear. Declared in each soul file above. For *hard* enforcement (block, not just instruct), gate the `mcp__linear-server__*` tools with a `PreToolUse` hook keyed to the active cap — caps are prompt postures, so only a hook can truly lock a tool.
+- **Linear: reads open to every cap; writes are Project-Manager-only.** Any cap (or none) can *read* the board for context; only the PM cap *writes* it — every other cap routes board changes through `/cap-project-manager`. The Developer still reads task AC from the task doc the PM keeps synced (the canonical home), not by browsing Linear. Declared in each soul file above. For *hard* enforcement (block, not just instruct), a `PreToolUse` hook on `mcp__linear-server__*` allows the read verbs (`list_`/`get_`/`search_`/`extract_`) from any posture and gates the write verbs to the PM cap — caps are prompt postures, so only a hook can truly lock a tool.
 
 ## The default auto-selects a cap
 
@@ -38,6 +38,12 @@ There is **always a posture**. If the user hasn't put a cap on, **choose one and
 > e.g. "🔨 Putting on the **Developer** cap — you have a ready task. (override with any `/cap-*`)"
 
 The user overrides anytime: a `/cap-*` command, "yes" to a proposed hand-off, or **"cap off"** for bare mode (no posture, raw adaptive behavior).
+
+## A cap is sticky — only the user switches it
+
+Once a cap is set it **holds for the whole session**; the agent **never changes caps on its own**. Auto-select fires **only at first touch** — when no cap has been set this session — and even then it announces itself and is overridable. After one is set, it stays until *the user* types another `/cap-*` or **"cap off"**. Finishing a phase is a **hand-off offer**, not a self-switch: the cap proposes the next posture and waits for the user's `/cap-*` or "yes" — it never silently puts on the next hat. (Editing docs, running a build, or committing inside a posture is that posture doing its job, not a reason to change hats.)
+
+State is **per-session**, keyed by session id: another agent — even one on the same repo — changing *its* cap never moves *yours*. A fresh session therefore starts with **no cap** (Linear *writes* stay gated until you set Project-Manager; reads are open) rather than inheriting whatever another session last selected. Enforced in [`hooks/cap-set.sh`](../../../hooks/cap-set.sh) (writes `~/.claude/.active-cap-<session_id>`) and read by [`hooks/cap-guard-linear.sh`](../../../hooks/cap-guard-linear.sh) + [`hooks/cap-statusline.sh`](../../../hooks/cap-statusline.sh).
 
 ## Switching
 
