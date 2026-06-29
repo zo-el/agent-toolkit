@@ -33,6 +33,7 @@ The backlog is the project's queue of known-but-unscheduled work. It must never 
 
 - If it's fixable in **under ~15 minutes** in the session that surfaced it, fix it — don't file it.
 - **Feature-tied deferred work isn't a backlog item — yet.** "Do X once feature/task Y ships or finalizes" stays a note in Y's task (its **Anything else** / out-of-scope section), where develop → finalize owns it. It becomes a backlog item only once Y is **completed** and the work is still pending.
+- **Already a planned task? Not a backlog item.** Before filing, grep `specs/*/tasks/` (and any board the repo mirrors to) — if a task already owns the work, fold the concern into it (an AC line or its **Anything else**), not the backlog. The backlog is for *un*tracked follow-ups; a duplicate of planned work only rots there.
 - **Deployment-surfaced issues belong to the deploy, not the backlog.** A rejected token, a dark fleet metric, a failing health check that shows up during/after a deploy is fixed in the deploy work — the runbook owns "deployment works" and verifies it before declaring done. Parking it as backlog means the release shipped incomplete.
 - Every new item gets a **Priority at creation**: P0 = blocks releases or correctness; P1 = real recurring friction; P2 = nice-to-have.
 - Cite the `Source` (session/plan/review that surfaced it) and end the notes with the concrete next action.
