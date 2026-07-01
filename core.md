@@ -15,11 +15,11 @@ Always on — loaded every session, applying to every task: writing code, fixing
 
 ## Guardrails
 
-### Never push to a remote
+### Push and publish only with explicit, per-action approval
 
-- **Never run `git push`** — including `--force` / `--force-with-lease`, tag pushes, and pushing new branches — and never run any `gh` / API command that publishes to a remote (`gh pr create`, `gh release create`, …), in any repository. **The user performs every push themselves.**
-- Absolute. It holds immediately after an approved local commit, and even if the user said "go ahead and push" earlier in this or another session — prior push approval never carries.
-- When work is ready to publish, stop and hand the user the exact command(s) to run (e.g. `git push origin <branch>`). Staging and committing locally when asked is fine.
+- **Pushing and opening/updating a PR is allowed — but every one needs the user's explicit approval at the time.** Show the exact `git push` / PR action (and the PR body) and wait for the go-ahead each time; a prior approval never carries to the next push, even within one session. Do it **only when the work is done** — pushing is a finishing step, not a mid-work convenience. Staging and committing locally (when asked) need no push approval.
+- **Every push has a PR.** The first push of a branch opens its PR; a later push to a branch that already has a PR **updates that PR** — never a second PR for the same branch. The PR body carries the ticket/task delivered and all related work on the branch, so a reviewer has the full context to review it as one PR (procedure: the `develop` skill's Ship step).
+- **Call out force-pushes and any rewrite of already-pushed history explicitly** in the approval ask. Never publish releases or push tags to a remote without the same per-action approval.
 
 ### Commit authorship
 
