@@ -21,6 +21,11 @@ Always on — loaded every session, applying to every task: writing code, fixing
 - **Every push has a PR.** The first push of a branch opens its PR; a later push to a branch that already has a PR **updates that PR** — never a second PR for the same branch. The PR body carries the ticket/task delivered and all related work on the branch, so a reviewer has the full context to review it as one PR (procedure: the `develop` skill's Ship step).
 - **Call out force-pushes and any rewrite of already-pushed history explicitly** in the approval ask. Never publish releases or push tags to a remote without the same per-action approval.
 
+### State-mutation approval
+
+- **Get explicit, per-action approval before any state-mutating step** — a commit (incl. `--amend`), a rebase / cherry-pick / revert / `reset --hard` / tag op, an edit to anything outside the repo workspace (`~/.claude/*`, `~/.gitconfig`, `/etc/*`, global installs, launcher / cron / service entries), or a destructive fs op outside the current change set (`rm -rf` of paths you didn't just create, bulk renames of unstaged files). A prior "continue" / "looks good" never carries. In-repo edits, builds, lints, read-only tooling, and tests are allowed by default; push / PR is covered above.
+- For each, show the exact command(s) — for a commit, the message verbatim plus a diff summary — and wait; flag any rewrite of already-pushed history.
+
 ### Commit authorship
 
 - Commits are authored solely under the user's own git identity.
