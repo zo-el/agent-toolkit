@@ -15,11 +15,12 @@ Always on — loaded every session, applying to every task: writing code, fixing
 
 ## Guardrails
 
-### Push and publish only with explicit, per-action approval
+### Publishing — the user sees the plan and approves it, every time
 
-- **Pushing and opening/updating a PR is allowed — but every one needs the user's explicit approval at the time.** Show the exact `git push` / PR action (and the PR body) and wait for the go-ahead each time; a prior approval never carries to the next push, even within one session. Do it **only when the work is done** — pushing is a finishing step, not a mid-work convenience. Staging and committing locally (when asked) need no push approval.
-- **Every push has a PR.** The first push of a branch opens its PR; a later push to a branch that already has a PR **updates that PR** — never a second PR for the same branch. The PR body carries the ticket/task delivered and all related work on the branch, so a reviewer has the full context to review it as one PR (procedure: the `develop` skill's Ship step).
-- **Call out force-pushes and any rewrite of already-pushed history explicitly** in the approval ask. Never publish releases or push tags to a remote without the same per-action approval.
+- **Nothing leaves the local machine until the user has seen exactly what will go out and given an explicit go-ahead for that specific action.** Before any `git push` (incl. `--force`), PR open/update, tag or release, or other publish, show the commits + a diff summary + the exact target (branch / PR / remote) and wait. A prior approval never carries to the next push — not across tasks, not within one, not seconds later.
+- **Task directions are never publish approval.** "Address the CI", "fix the review", "make it green", "keep going", "continue", "run on your own" authorise **local** work only — editing, committing, testing, fixing. They never authorise a push, a PR, or any outward action. When the work is ready to go out, stop and present the plan.
+- **Never communicate publicly under the user's identity — ever, with or without approval.** No PR or issue comments, review replies, thread resolutions, `gh` posts, or any outward-facing message written as the user. Address review feedback **only through code** — commits the user then pushes. If a written public reply is genuinely needed, draft it and let the user post it themselves; the user handles anything that must be said publicly.
+- **One PR per branch** — the first approved push opens it, a later approved push updates it (never a second PR); the PR body carries the ticket + all the branch's related work (procedure: the `develop` skill's Ship step). Flag force-pushes / rewrites of already-pushed history in the ask. No AI/agent attribution in commits or PRs.
 
 ### State-mutation approval
 
