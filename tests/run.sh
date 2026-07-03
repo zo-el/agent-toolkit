@@ -124,6 +124,18 @@ sl '' 'empty stdin'
 sl '{"model":{"id":"claude-fable-5[1m]","display_name":"Fable 5"},"effort":{"level":"max"},"context_window":{"used_percentage":42,"context_window_size":1000000,"total_input_tokens":420000},"cost":{"total_cost_usd":1.5},"rate_limits":{"five_hour":{"used_percentage":23.5},"seven_day":{"used_percentage":81.2}},"workspace":{"current_dir":"/tmp"}}' 'full native payload'
 sl '{"transcript_path":"/nonexistent.jsonl","workspace":{"current_dir":"/nonexistent-dir"}}' 'bogus paths'
 
+# ── install.sh invoked via its own stable symlink must not self-loop ──
+fh="$(mktemp -d)"
+if HOME="$fh" "$root/install.sh" >/dev/null 2>&1 \
+   && HOME="$fh" "$fh/.claude/agent-toolkit/install.sh" --sync >/dev/null 2>&1 \
+   && [ "$(readlink -f "$fh/.claude/agent-toolkit")" = "$root" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1))
+  echo "FAIL install.sh     symlink self-loops when run via ~/.claude/agent-toolkit"
+fi
+rm -rf "$fh"
+
 echo "────────────────────────────────"
 echo "pass: $pass  fail: $fail"
 [ "$fail" -eq 0 ]

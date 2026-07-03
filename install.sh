@@ -16,7 +16,10 @@
 # ~/.claude/backups first.
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# pwd -P: when invoked via the ~/.claude/agent-toolkit symlink (the
+# SessionStart hook does), the physical path keeps ROOT at the real checkout —
+# logical pwd would return the symlink itself and ln -sfn it into a self-loop.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 CLAUDE_DIR="$HOME/.claude"
 STABLE="$CLAUDE_DIR/agent-toolkit"
 SETTINGS="$CLAUDE_DIR/settings.json"

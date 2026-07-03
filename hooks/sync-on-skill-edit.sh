@@ -5,7 +5,7 @@
 # every unrelated file edit (the old wiring ran it unconditionally).
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command -v jq >/dev/null 2>&1 || exit 0
 fp="$(cat | jq -r '.tool_input.file_path // empty' 2>/dev/null)" || exit 0
 [ -n "$fp" ] || exit 0

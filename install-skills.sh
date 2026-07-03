@@ -4,7 +4,9 @@
 # PostToolUse hooks) to pick up new, renamed, or removed skills.
 set -euo pipefail
 
-skills_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/skills" && pwd)"
+# pwd -P: resolve to the real checkout even when invoked via the
+# ~/.claude/agent-toolkit symlink, so skill links never route through it.
+skills_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/skills" && pwd -P)"
 dest="$HOME/.claude/skills"
 mkdir -p "$dest"
 
