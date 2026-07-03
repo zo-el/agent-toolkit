@@ -24,7 +24,7 @@ Prose and formatting follow the `documentation-style` skill; these are the spec-
 
 - State the **expected end-state** as standing truth — what the component is meant to do, the contract it exposes.
 - **Code shapes are the expected shape, not the implementation** — types, externs, payloads, endpoints as rough code with a one-line note of intent; never paste real code.
-- **No status** — no `Status:` headers, no Implemented/Planned/Delta sections; tasks carry status.
+- **No status, no tracking** — no `Status:` headers, no Implemented/Planned/Delta sections, and no execution history (PR numbers, merge dates, tracker IDs, "shipped" notes): the spec states what is; open todos live in `tasks/`, and the when/where/who lives in the tracker and git.
 - Cite existing code as `path:line` (with a `**Paths relative to:**` header line); don't paste it.
 - Error/edge behavior is part of the contract: response variants, failure modes, and trust/threat notes are decisions too.
 

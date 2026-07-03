@@ -25,9 +25,9 @@ documentation/
 - **Documentation discipline:** no unsolicited `.md` files; spec/task deliverables are the carve-out.
 - Any stack-specific session rules (e.g. "commands run inside `nix develop -c`" for flake repos).
 
-## documentation/README.md (the board) must state
+## documentation/README.md (the spec space) must state
 
-- The specs index table (feature → status, pipe-aligned).
+- The `specs/` directory **is the index** — a feature is in flight while its `tasks/` catalog exists, implemented once it's deleted; no status table to maintain (when work mirrors to a tracker, that is the live board).
 - Where specs and tasks live (`specs/<feature>/` + `tasks/`), one line each on what they are.
 - Any repo-specific spec rules (e.g. citation rooting conventions, cross-repo sync expectations for multi-repo projects).
 

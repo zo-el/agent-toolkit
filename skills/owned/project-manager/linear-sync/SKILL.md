@@ -33,6 +33,7 @@ Before any Linear write, resolve **this project's Linear binding** — a `## Lin
 ## Mapping — ownership, not duplication
 
 - Each task → an issue in **the project that owns that work**; **shared machinery many services merely *use* lives once**, in the project that owns it — never a task per consumer.
+- **No milestone-less issues.** Every issue lands in a milestone: feature work in its round milestone; miscellaneous / bug work in the project's standing **`Misc & bugs`** catch-all, target-dated **two weeks before the project's target date** (create it on first need; sweep strays into it when found). An issue with no project first needs a project decision.
 - **Area → the binding's existing labels**; **type → Feature / Bug / Improvement**; **weight → the team's estimate**, by scope; **priority only for the high ones**; **cycle** by the cycle rule below; **assignee** left to the user.
 - **Status** (binding's state names): planned → Backlog/Ready · building → In Progress · in review → In-Review/Test · shipped → Done · dropped → Canceled.
 
@@ -52,7 +53,8 @@ When the team runs cycles, set every issue's cycle to the **week it's planned to
 
 ## Discipline
 
+- **Clone freshness first.** Before a sync, check the local clone against its remote tip (`gh api repos/<owner>/<repo>/commits?sha=<base>` works when `git fetch` doesn't): a stale or diverged clone's docs aren't truth — statuses lag, and locally-filed IDs collide with items filed from other machines. Reconcile first; if reconciling is blocked, sync only what merged-PR evidence supports and say so.
 - **Local task first — never Linear-first.** Every Linear issue mirrors a task that already exists locally (`specs/<feature>/tasks/NN-*.md`, or the round's parent). **Never create or update a Linear issue without its local task existing first** — the repo is the plan's source of truth, so a Linear-only issue is invisible to anyone reading the local copies and gets lost. About to write to Linear with no local home? Stop, create the local task, then mirror.
-- **Outward-facing — approve before writing.** At each gate show the planned create/update (title, milestone, parent, status, labels, weight) and get an OK. Reads are free.
+- **Outward-facing — approve before writing.** At each gate present every planned write grouped **Project → Milestone**, one row per task — `local task ↔ issue` — with each changing field as a labeled source→target diff (`Linear: <current> → <new>`, alongside what the local doc says; creates marked `new`), and get an OK. A bare unlabeled "now" hides which side it describes. Reads are free.
 - **Gates:** a round reaches `ready` → create milestone + parent + task-issues · build-start → pull AC + comments and reconcile · status flips → update · `develop` Ship → move to Done + paste the as-built plan as a comment.
-- **MCP gotchas:** `save_milestone` rename only applies when a `description` is passed in the same call; a large parallel `save_issue` batch can silently drop its first calls — verify each result's `updatedAt` / `parentId` and retry any that didn't take.
+- **MCP gotchas:** `save_milestone` rename only applies when a `description` is passed in the same call; a large parallel `save_issue` batch can silently drop its first calls — verify each result's `updatedAt` / `parentId` and retry any that didn't take; setting a started/completed state auto-adds the current cycle — if the issue shouldn't sit in the cycle, null `cycle` in a separate follow-up call (a combined state+cycle:null call loses to the auto-add).
