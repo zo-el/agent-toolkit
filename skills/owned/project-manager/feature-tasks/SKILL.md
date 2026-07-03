@@ -19,6 +19,10 @@ Planning breaks the spec into ordered, self-contained tasks in `documentation/sp
 
 Order tasks **build-first, deploy-together**: build tasks land and are reviewed without touching the live system; the live cutover is **one release task** (the release/deploy track owns it), gated on the build tasks. Two carve-outs: a deployment that does **not** affect the live system and only stands a tool up can land **independently**; a **test/staging deploy** may precede the official one as its own task. Keep live/infra-cutover acceptance criteria in the release task, never in the build tasks.
 
+## Build, then the testing phase
+
+A round's catalog is build tasks **plus a testing phase**: after the build tasks, plan the **automated e2e + manual test pass** that proves the round's outcomes together — one task (or a small set) with AC like any other, covering the end-to-end flows and the user-facing checks. Build tasks still carry their own tests (the `develop` gate); the testing phase is the round-level proof, and it precedes any release/deploy task (**build → test → release**). What it surfaces is decided in the round — fixed, tasked, or explicitly accepted — per the `backlog` skill's active-work rule.
+
 ## Two-stage planning
 
 1. **Catalog pass** — for the whole feature, create AC-only stubs (Title, Status, AC, 2–3 line context) so the user reviews the breakdown before any deep planning.
