@@ -42,4 +42,4 @@ Name the cap(s) it *could* apply to: exactly one → owned; more than one → cr
 
 ## Lifecycle
 
-The `skills/` tree **is** the catalog — self-describing via frontmatter, no hand-maintained index. Install is discovery-driven: `install-skills.sh` symlinks every directory containing a `SKILL.md` at **any depth** (grouping folders like `caps/` `owned/` `cross-cutting/` carry none) and prunes broken links, so adding a skill in any group folder needs no edit elsewhere. Basenames stay unique across the tree.
+The `skills/` tree **is** the catalog — self-describing via frontmatter, no hand-maintained index. Install is discovery-driven: `install-skills.sh` symlinks every directory containing a `SKILL.md` at **any depth** (grouping folders like `caps/` `owned/` `cross-cutting/` carry none) and prunes broken links, so adding a skill in any group folder needs no edit elsewhere. Basenames stay unique across the tree. The full change lifecycle — verify, land, propagate to other machines — is the `toolkit-maintenance` skill; this one owns the craft of the skill file itself.

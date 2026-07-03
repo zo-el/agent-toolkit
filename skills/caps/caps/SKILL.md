@@ -18,7 +18,7 @@ Each cap is a soul file: **Who you are · What you use · Boundaries · Hand-off
 | 🔨 Developer | `/cap-developer` | makes a ready task real and tested | `develop` · `ui-development` | yes — full edit |
 | 🔍 Reviewer | `/cap-reviewer` | the adversary the work must survive | `/code-review` · `/security-review` | reports, doesn't patch |
 
-**Cross-cutting** (any cap may use; owned by none): `documentation-style` · `plannotator-loop` · `orchestrating-subagents`.
+**Cross-cutting** (any cap may use; owned by none): `documentation-style` · `plannotator-loop` · `orchestrating-subagents` · `toolkit-maintenance` (folding a learning back into the toolkit and landing it).
 
 Natural flow: `/cap-architect-designer` → `/cap-project-manager` → `/cap-developer` ⇄ `/cap-reviewer` → ship.
 
