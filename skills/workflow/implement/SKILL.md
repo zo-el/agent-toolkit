@@ -1,11 +1,11 @@
 ---
-name: software-development
-description: The end-to-end development workflow — spec → plan → develop → finalize. Fires the moment a session turns to building or changing a feature (new functionality described, a feature/fix handed over, a change scoped). Owns the phase sequence and gates; never jump to code — detect the entry phase from the conversation.
+name: implement
+description: The end-to-end development workflow — spec → plan → develop → finalize. Fires the moment a session turns to building or changing ANY code — a feature, a fix, a chore, or a backlog item, not just new functionality — including when the user types /implement or says "implement", "work on", "develop", "execute", "build", or "ship". Owns the phase sequence and gates; scale the phases to the change but never the gates; never jump to code — detect the entry phase from the conversation.
 ---
 
-# Software development workflow
+# Implement — the development workflow
 
-Every feature moves through four phases. Each phase's full procedure is its own skill — this skill owns the **sequence, the gates, and the transitions**. The user never has to name the workflow or a phase; detect it.
+Every change runs through this workflow — a feature through all four phases; a fix, chore, or backlog item enters at the phase it needs (usually straight to Develop). Each phase's full procedure is its own skill — this skill owns the **sequence, the gates, and the transitions**. The user never has to name the workflow or a phase; detect it, or run it explicitly with `/implement`.
 
 ## The flow
 
@@ -20,6 +20,7 @@ The `develop` skill is **not** feature-only — it's the universal build → tes
 
 ## Flow rules
 
+- **Scale the phases, never the gates.** A small change may skip Phases 1–2 and enter at Develop — but the `develop` gates hold at *every* size: fmt / lint / typecheck / tests, an **actual `/code-review` invocation** (never merely offered, never a hand-rolled substitute), and the finalize Definition of Done (changelog, published-crate check, backlog sweep, PR). "It's only N lines" never justifies skipping a gate; if one feels disproportionate, run it anyway and say why.
 - **Enter at the phase the work actually needs:** a new or revised contract → Phase 1; an approved spec → Phase 2; a `ready` task → Phase 3. Never code ahead of the phase the artifacts support.
 - **Tasks move through 3–4 one at a time**; after one ships, return to the catalog for the next (or to Phase 1/2 if the spec moved).
 - **Phase boundaries are user gates** — review rounds on specs and plans, explicit status flips on tasks, per-action approval on commits. Don't cross one silently.

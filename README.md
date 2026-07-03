@@ -10,7 +10,7 @@ Two tiers, matching how Claude Code loads them:
 
 - **[`core.md`](core.md) — always-on principles.** Imported by this repo's [`CLAUDE.md`](CLAUDE.md), so it's in context every session and every task: how to work (simple-but-finished, production focus, reuse, verify against reality, sweep on rename, one-home) and the git guardrails (publishing — push / PR / public comment — gated on a shown plan + explicit go-ahead; never post as the user; no AI attribution). Small and stable — principles, not procedures — so they apply during a chore or a one-line edit just as much as a feature.
 - **[`skills/`](skills/) — on-demand procedures and reference.** Each a self-describing `SKILL.md` whose `description` frontmatter is the auto-trigger; the body loads only when it's relevant. **The skills are their own catalog** — [`ls skills/`](skills/) is the list, adding one needs no edit here. They cover:
-  - **Feature workflow** — `software-development` owns spec → plan → develop → finalize, delegating each phase to its own skill; every phase skill also fires on its own mid-flow.
+  - **Feature workflow** — `implement` owns spec → plan → develop → finalize, delegating each phase to its own skill; every phase skill also fires on its own mid-flow.
   - **Work tracking** — chosen by what the work *is*: a **feature** (the workflow above), a **chore** (a maintenance execution doc), a **backlog** item (the unscheduled queue).
   - **Review loops** — iterative rounds until one comes back clean: one for documents/plans, one for UI development (screenshot galleries of the real app).
   - **Writing style** — how code comments, markdown, and changelogs should read; applied by type whenever you write or edit them.
