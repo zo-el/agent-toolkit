@@ -39,7 +39,7 @@ A chore is **maintenance — managing, monitoring, migrating, or fixing what alr
 
 **Value-moving chores** (migrations, credential / account rotations) add a **config map** — each value, where it's produced, and where it's consumed (file:line, secret, or env key) — and route the secrets through a **single local config / env file** as the handoff, so there's one place to fill and pass on, not many scattered edits.
 
-Tick the boxes as the work lands. A chore is reviewed with `plannotator-loop` and shipped with `ship-workshop-feature`, and every state-mutating step takes the standing per-action approval — the same as any work, nothing chore-specific.
+Tick the boxes as the work lands. A chore is reviewed with `plannotator-loop` and shipped per the `develop` skill's Ship step, and every state-mutating step takes the standing per-action approval — the same as any work, nothing chore-specific. When the project mirrors to Linear (`linear-sync`), a chore mirrors like a task: a release chore into its release milestone, an ops chore into the owning project's `Misc & bugs`.
 
 ## Filing it right
 

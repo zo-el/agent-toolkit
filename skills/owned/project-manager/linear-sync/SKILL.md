@@ -29,6 +29,11 @@ Before any Linear write, resolve **this project's Linear binding** — a `## Lin
 3. **While implementing** — re-read the issue's AC + comments when you pick a task up and again before closing it; fold any change others made into the plan with the user **before** it's done.
 4. **On done** — move the issue to Done and **paste the as-built plan as a comment**.
 5. **Spec re-plan → a new round** — a re-plan that yields a *new set of tasks* gets a **new milestone + parent**, holding the new/incomplete tasks; already-completed tasks stay in their old round. The **label** spans all rounds; locally the `tasks/` dir is regenerated for the new round.
+6. **Feature ships (last task Done)** — delete the local `tasks/` set, flip the round's parent issue Done, and check the milestone's remaining scope + target date.
+
+## Board audit — reconcile drift
+
+On the PM cap at session start, or whenever asked what's out of sync: gather the three sides — local task/chore statuses, PR states via `gh` (open + merged since the last audit), the Linear issues per active label — then compare per task. Merged-PR evidence drives Done flips (each with its as-built comment); an open PR drives In-Review; a local doc lagging Linear gets flipped locally. Present the grouped preview (per Discipline below), get the OK, then write. Fan the gather out to parallel read-only agents when the surface is large (`orchestrating-subagents`).
 
 ## Mapping — ownership, not duplication
 

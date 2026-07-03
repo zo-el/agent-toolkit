@@ -12,7 +12,7 @@ The backlog is the project's queue of known-but-unscheduled work. It must never 
 - One file per item under `documentation/backlog/`: `B<NN>-<short-slug>.md`. The **directory is the catalog** — no index to sync; `ls` is the list.
 - Resolved / no-longer-applies items are **deleted** (git history is the archive). No "done" section, ever.
 - **Items never cross-reference each other.** Each item is self-contained; because items are deleted independently, a pointer to another item (`overlaps B29`, `see B30`, `B27 unblocks this`) becomes a dangling reference the moment that item resolves. State any shared context in the item's own words.
-- IDs are append-only; the next ID lives as a one-line counter in `documentation/backlog/README.md` — bump it in the same change that adds the item.
+- IDs are append-only; the next ID lives as a one-line counter in `documentation/backlog/README.md` — bump it in the same change that adds the item. The counter is only authoritative on a clone current with origin — check the remote README (or reconcile) before filing from a possibly-stale clone; on a collision the unpushed side renumbers.
 
 ## Item shape
 
