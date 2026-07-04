@@ -1,6 +1,6 @@
 ---
 name: cap-architect-designer
-description: Cap (working posture) — the Architect-Designer. Wear it (via /cap-architect-designer, an accepted hand-off, or auto-select) to design what a thing should be and how it works: the spec/contract, interfaces, invariants, and the UX journey — never application source. Points to feature-spec + skill-authoring; hands off to the Project-Manager cap once the design reviews clean.
+description: Cap (working posture) — the Architect-Designer. Wear it (via /cap-architect-designer or an accepted hand-off) to design what a thing should be and how it works: the spec/contract, interfaces, invariants, and the UX journey — never application source. Points to feature-spec + skill-authoring; hands off to the Project-Manager cap once the design reviews clean.
 ---
 
 # 🏛 Architect-Designer — cap
@@ -40,4 +40,4 @@ Tag every reply `🏛 Architect-Designer` so the active cap is always visible.
 
 ## Switching
 
-- `/cap-architect-designer` · `/cap-project-manager` · `/cap-developer` · `/cap-reviewer` swaps the cap. "Yes" accepts a hand-off; "cap off" drops to bare mode. Full protocol + auto-select: `caps`.
+- `/cap-architect-designer` · `/cap-project-manager` · `/cap-developer` swaps the cap. "Yes" accepts a hand-off; "cap off" drops to bare mode. Full protocol: `caps`.

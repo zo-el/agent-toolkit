@@ -46,7 +46,6 @@ CAP_STYLE = {
     "cap-architect-designer": (COLORS["blue"], "🏛 Architect-Designer"),
     "cap-project-manager": (COLORS["yellow"], "📋 Project-Manager"),
     "cap-developer": (COLORS["green"], "🔨 Developer"),
-    "cap-reviewer": (COLORS["red"], "🔍 Reviewer"),
     "off": (DIM, "○ cap off"),
 }
 

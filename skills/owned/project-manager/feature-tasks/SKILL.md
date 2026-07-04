@@ -1,9 +1,9 @@
 ---
 name: feature-tasks
-description: Phase 2 of the development workflow — break a finished spec into tasks. Use when a spec is ready to plan, when re-planning after a spec change, or when the user asks for tasks or acceptance criteria.
+description: The Plan phase of the development flow — break a finished spec into tasks. Use when a spec is ready to plan, when re-planning after a spec change, or when the user asks for tasks or acceptance criteria.
 ---
 
-# Feature tasks (Phase 2)
+# Feature tasks (the Plan phase)
 
 Planning breaks the spec into ordered, self-contained tasks in `documentation/specs/<feature>/tasks/NN-<name>.md`.
 
@@ -47,4 +47,4 @@ A round's catalog is build tasks **plus a testing phase**: after the build tasks
 
 ## Definition of Done
 
-DoD is uniform and owned by the `develop` skill's Ship step (tests green, review clean, changelog, spec sync, task deletion) — tasks state only their own AC and never restate it.
+DoD is uniform and owned by the `develop` skill's Ship step (tests green, review clean, changelog, spec sync, the task's completion flip) — tasks state only their own AC and never restate it.

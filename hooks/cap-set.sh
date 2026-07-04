@@ -21,13 +21,18 @@ state="$HOME/.claude/.active-cap${sid:+-$sid}"
 # Last qualifying token wins (a prompt rarely holds more than one).
 cap="$(printf '%s' "$input" \
   | sed -E 's/`[^`]*`//g' \
-  | grep -oiE '(^|[">]|\\n)/cap-(architect-designer|project-manager|developer|reviewer)' \
-  | grep -oiE 'cap-(architect-designer|project-manager|developer|reviewer)' \
+  | grep -oiE '(^|[">]|\\n)/cap-(architect-designer|project-manager|developer)' \
+  | grep -oiE 'cap-(architect-designer|project-manager|developer)' \
   | tail -n1 || true)"
 
 if [ -n "$cap" ]; then
   printf '%s\n' "$cap" > "$state"
-elif printf '%s' "$input" | grep -qiE '(^|[^a-z])cap[ -]off([^a-z]|$)'; then
+elif printf '%s' "$input" \
+  | grep -qiE '"prompt"[[:space:]]*:[[:space:]]*"(\\n|\\t|[[:space:]])*cap[ -]off\b|cap[ -]off[[:space:].!]*(\\n)*"[[:space:]]*[,}]'; then
+  # "cap off" counts only at the START or END of the typed prompt (leading
+  # whitespace arrives JSON-escaped as \n/\t — matched literally). Every soul
+  # file contains the phrase mid-text, so a pasted doc must never flip the
+  # session bare.
   printf 'off\n' > "$state"
 elif [ -f "$state" ]; then
   touch "$state"            # live session: refresh mtime so the prune below spares it

@@ -1,6 +1,6 @@
 ---
 name: cap-project-manager
-description: Cap (working posture) — the Project-Manager. Wear it (via /cap-project-manager, an accepted hand-off, or auto-select) to turn a reviewed design into scoped, sequenced, tracked work: tasks with acceptance criteria, mirrored to Linear, backlog kept honest. Points to feature-tasks + linear-sync + backlog + project-bootstrap + chore; hands off to the Developer cap once tasks are ready.
+description: Cap (working posture) — the Project-Manager. Wear it (via /cap-project-manager or an accepted hand-off) to turn a reviewed design into scoped, sequenced, tracked work: tasks with acceptance criteria, mirrored to Linear, backlog kept honest. Points to feature-tasks + linear-sync + backlog + project-bootstrap + chore; hands off to the Developer cap once tasks are ready.
 ---
 
 # 📋 Project-Manager — cap
@@ -40,4 +40,4 @@ Tag every reply `📋 Project-Manager` so the active cap is always visible.
 
 ## Switching
 
-- `/cap-architect-designer` · `/cap-project-manager` · `/cap-developer` · `/cap-reviewer` swaps the cap. "Yes" accepts a hand-off; "cap off" drops to bare mode. Full protocol + auto-select: `caps`.
+- `/cap-architect-designer` · `/cap-project-manager` · `/cap-developer` swaps the cap. "Yes" accepts a hand-off; "cap off" drops to bare mode. Full protocol: `caps`.

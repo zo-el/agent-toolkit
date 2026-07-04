@@ -5,7 +5,7 @@ description: Scaffold a new project with the user's standard development contrac
 
 # Project bootstrap
 
-Write the thin, repo-visible contract into a new project. The workflow **procedures** live in the agent-toolkit skills (`implement` + the phase skills) — the repo carries only pointers plus its own specifics. **One home per rule.**
+Write the thin, repo-visible contract into a new project. The workflow **procedures** live in the agent-toolkit skills — the `caps` skill maps the phases and their skills — so the repo carries only pointers plus its own specifics. **One home per rule.**
 
 ## Files to create
 
@@ -19,7 +19,7 @@ documentation/
 
 ## CLAUDE.md must state
 
-- **The workflow pointer:** the moment a session turns to building/changing a feature, follow the agent-toolkit `implement` skill, starting at Phase 1 — detected from conversation, never prompted for. Spec style per `feature-spec`.
+- **The workflow pointer:** the moment a session turns to building/changing a feature, follow the agent-toolkit development flow — the `caps` skill maps the phases (spec → plan → develop) and their skills; enter at the phase the work needs — detected from conversation, never prompted for.
 - **For non-Claude agents/humans:** the core principles (`core.md`) and skills are plain markdown — include the toolkit clone command (`git clone git@github.com:zo-el/agent-toolkit.git`).
 - **State-mutation approval:** per-action approval for git commits/rebases, user/system config edits, and destructive fs ops; in-repo edits, builds, and tests allowed by default. **Publishing — any push, PR create/update, or public comment — is gated on showing the user the plan and getting an explicit go-ahead** (`core.md` § Publishing); never push or post on the user's behalf, and never add AI attribution to commits or PRs.
 - **Documentation discipline:** no unsolicited `.md` files; spec/task deliverables are the carve-out.

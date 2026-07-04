@@ -7,7 +7,7 @@ description: Run maintenance on the running system — a migration, credential/a
 
 A chore is **maintenance — managing, monitoring, migrating, or fixing what already runs** — that we are doing now. The three work tracks differ by what the work *is*:
 
-- **Feature** — a new **function of the product or network** (a capability or behaviour users get). Runs the full `implement` flow.
+- **Feature** — a new **function of the product or network** (a capability or behaviour users get). Runs the full caps flow (`caps` maps the phases and their skills).
 - **Chore** (this skill) — **maintaining / managing / monitoring** the running system: account or credential rotations, migrations, dependency bumps, config or rename sweeps, infra cutovers. Nothing to design — one doc, then do it.
 - **Backlog** — **not urgent**: won't be missed if skipped, addressed when there's spare time.
 

@@ -124,6 +124,26 @@ sl '' 'empty stdin'
 sl '{"model":{"id":"claude-fable-5[1m]","display_name":"Fable 5"},"effort":{"level":"max"},"context_window":{"used_percentage":42,"context_window_size":1000000,"total_input_tokens":420000},"cost":{"total_cost_usd":1.5},"rate_limits":{"five_hour":{"used_percentage":23.5},"seven_day":{"used_percentage":81.2}},"workspace":{"current_dir":"/tmp"}}' 'full native payload'
 sl '{"transcript_path":"/nonexistent.jsonl","workspace":{"current_dir":"/nonexistent-dir"}}' 'bogus paths'
 
+# ── cap-set: only the three real caps + a typed "cap off" flip state ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+cap_case() { # $1 sid, $2 seed state ("" = none), $3 payload json, $4 expected, $5 label
+  local got
+  [ -n "$2" ] && printf '%s\n' "$2" > "$fh/.claude/.active-cap-$1"
+  printf '%s' "$3" | HOME="$fh" "$root/hooks/cap-set.sh" >/dev/null 2>&1
+  got="$(cat "$fh/.claude/.active-cap-$1" 2>/dev/null || echo "<none>")"
+  if [ "$got" = "$4" ]; then pass=$((pass + 1)); else
+    fail=$((fail + 1))
+    printf 'FAIL cap-set.sh     want=%-13s got=%-13s %s\n' "$4" "$got" "$5"
+  fi
+}
+cap_case t1 "" '{"session_id":"t1","prompt":"/cap-developer please"}' cap-developer "/cap-developer sets state"
+cap_case t2 cap-developer '{"session_id":"t2","prompt":"/cap-reviewer please"}' cap-developer "removed /cap-reviewer must not flip state"
+cap_case t3 cap-developer '{"session_id":"t3","prompt":"cap off"}' off "'cap off' alone flips to off"
+cap_case t4 cap-developer '{"session_id":"t4","prompt":"the doc says \"cap off\" drops to bare mode - thoughts?"}' cap-developer "mid-text 'cap off' (pasted doc) must not flip"
+cap_case t5 cap-project-manager '{"session_id":"t5","prompt":"board updated, thanks - cap off"}' off "'cap off' at prompt end flips to off"
+cap_case t6 cap-developer '{"session_id":"t6","prompt":"\ncap off"}' off "shift-enter (JSON-escaped newline) before 'cap off' still flips"
+rm -rf "$fh"
+
 # ── install.sh invoked via its own stable symlink must not self-loop ──
 fh="$(mktemp -d)"
 if HOME="$fh" "$root/install.sh" >/dev/null 2>&1 \
