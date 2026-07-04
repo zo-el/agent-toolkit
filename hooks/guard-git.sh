@@ -5,10 +5,12 @@
 #   deny  public communication as the user (gh pr/issue comment, gh pr review,
 #         mutating gh api calls on comment/review endpoints) — never allowed,
 #         with or without approval; draft it and the user posts it themselves.
-#   ask   publishing (push / PR / release / package publish) and state
-#         mutation (commit, history rewrites, destructive rm outside the
-#         workspace, shell writes into ~/.claude, global installs, sudo,
-#         cron/service edits) — forces the show-the-plan-and-wait prompt.
+#   ask   publishing (push / PR / release / package publish) and destructive
+#         or device state (reset --hard / clean -f / filter-branch, recursive
+#         rm outside the workspace, shell writes into ~/.claude, global
+#         installs, sudo, cron/service edits) — the show-the-plan-and-wait
+#         prompt. Local git workflow (commits, branches, rebases, tags) is
+#         deliberately NOT gated: the push ask is where work gets reviewed.
 #
 # Matching is substring-regex over the whole command string, so compound
 # commands ("cd x && git push") are caught. A quoted mention of a gated
@@ -52,14 +54,8 @@ hit '\b(npm|yarn|pnpm|cargo)[[:space:]]+publish\b|\btwine[[:space:]]+upload\b' \
   && verdict ask "Publish gate (core.md): package publishing — needs explicit per-action approval."
 
 # ── state mutation: per-action approval, a prior 'continue' never carries ──
-hit '\bgit[[:space:]]+commit([[:space:]]|$|[;&|])' \
-  && verdict ask "State-mutation gate (core.md): commits need per-action approval — message verbatim + diff summary."
-hit '\bgit[[:space:]]+(rebase|cherry-pick|revert|filter-branch|filter-repo)\b' \
-  && verdict ask "State-mutation gate (core.md): history operation — needs per-action approval; flag rewrites of pushed history."
-hit '\bgit[[:space:]]+reset\b[^|;&]*--hard|\bgit[[:space:]]+clean\b[^|;&]*-[a-zA-Z]*f' \
-  && verdict ask "State-mutation gate (core.md): discards working state — needs per-action approval."
-hit '\bgit[[:space:]]+tag[[:space:]]+(-[dfasm]|[^-[:space:]])' \
-  && verdict ask "State-mutation gate (core.md): tag operation — needs per-action approval."
+hit '\bgit[[:space:]]+reset\b[^|;&]*--hard|\bgit[[:space:]]+clean\b[^|;&]*-[a-zA-Z]*f|\bgit[[:space:]]+(filter-branch|filter-repo)\b' \
+  && verdict ask "State-mutation gate (core.md): discards uncommitted work or rewrites history wholesale — needs per-action approval."
 hit '\bgit[[:space:]]+config\b[^|;&]*--global' \
   && verdict ask "State-mutation gate (core.md): ~/.gitconfig is outside the repo workspace — needs per-action approval."
 hit '(^|[;&|][[:space:]]*)sudo\b' \

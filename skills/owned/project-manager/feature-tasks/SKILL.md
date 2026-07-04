@@ -10,7 +10,7 @@ Planning breaks the spec into ordered, self-contained tasks in `documentation/sp
 ## The catalog
 
 - The `tasks/` directory **is** the catalog: the Status line separates open from completed; no separate index to sync. A completed task stays as a historical reference (`Status: completed` — as-built truth lives in the spec docs) until the feature ships, and is **frozen the moment it completes** — never edited again, so it carries no pointer to live or other work; the set is deleted together once every task is implemented.
-- Numbered by build order; reorder/renumber/remove freely while open (use plain `mv`, never commit without approval).
+- Numbered by build order; reorder/renumber/remove freely while open (use plain `mv`).
 - **Self-contained, both directions:** nothing points at a task (not specs, not code, not siblings), **and** a task points at no other file for its work or status — no "open work in B<NN>", no "see task 03". Need something an earlier task produces, or to record follow-up / out-of-scope work? State it as a **precondition or note in your own words**, never a pointer to another file.
 - One coherent outcome per task; parallel work stays inside one task as sections under a single AC set.
 - **Don't pre-split by instance or round:** one task holds the plan (per-instance deltas as sections) until execution genuinely needs breaking out.

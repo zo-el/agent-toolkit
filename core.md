@@ -24,8 +24,8 @@ Always on — loaded every session, applying to every task: writing code, fixing
 
 ### State-mutation approval
 
-- **Get explicit, per-action approval before any state-mutating step** — a commit (incl. `--amend`), a rebase / cherry-pick / revert / `reset --hard` / tag op, an edit to anything outside the repo workspace (`~/.claude/*`, `~/.gitconfig`, `/etc/*`, global installs, launcher / cron / service entries), or a destructive fs op outside the current change set (`rm -rf` of paths you didn't just create, bulk renames of unstaged files). A prior "continue" / "looks good" never carries. In-repo edits, builds, lints, read-only tooling, and tests are allowed by default; push / PR is covered above.
-- For each, show the exact command(s) — for a commit, the message verbatim plus a diff summary — and wait; flag any rewrite of already-pushed history.
+- **Local git workflow is free** — commits (incl. `--amend`), branches, merges, rebases / cherry-picks / reverts, and tags need no approval: the publish gate above is where the work is reviewed before anything leaves the machine. Flag any rewrite of already-pushed history in the eventual push ask.
+- **Get explicit, per-action approval before anything that destroys local work or touches the device** — `reset --hard` / `clean -f` / `filter-branch`-class rewrites (they erase uncommitted state or history wholesale), an edit to anything outside the repo workspace (`~/.claude/*`, `~/.gitconfig`, `/etc/*`, global installs, launcher / cron / service entries), or a destructive fs op outside the current change set (`rm -rf` of paths you didn't just create, bulk renames of unstaged files). A prior "continue" / "looks good" never carries; show the exact command(s) and wait. In-repo edits, builds, lints, read-only tooling, and tests are allowed by default; push / PR is covered above.
 
 ### Commit authorship
 
