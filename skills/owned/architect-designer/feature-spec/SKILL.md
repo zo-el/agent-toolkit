@@ -30,7 +30,7 @@ Prose and formatting follow the `documentation-style` skill; these are the spec-
 
 ## Discipline
 
-- **End the spec with a `## Suggested breakdown` section in README.md** — the natural build units the design implies: a title + one-line outcome each, in rough dependency order. No AC, no implementation steps — it's decomposition *input* for the Plan phase, consumed and removed when the catalog lands (`feature-tasks` owns that pass).
+- **End the spec with a `## Suggested breakdown` section in README.md** — the natural build units the design implies, **one per component it touches** (plus any test or deploy phase): a title + one-line outcome each, in rough dependency order. No AC, no implementation steps — it's decomposition *input* for the Plan phase, consumed and removed when the catalog lands (`feature-tasks` owns that pass, and names each unit for its component).
 - **Speccing touches only the specs** — never update tasks, code, or other docs to match a revised spec; reconciling them is Plan-phase work (`feature-tasks`).
 - **Ripple every decision change through the whole spec folder in the same pass** — diagrams, error tables, naming, sibling docs. Grep the folder for stale terms before finishing (renamed functions, removed fields, dead error codes).
 - **Keep specs and code in sync** — when later code changes alter documented behavior, the matching spec doc updates in the same change.
