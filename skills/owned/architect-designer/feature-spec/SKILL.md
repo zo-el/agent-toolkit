@@ -1,6 +1,6 @@
 ---
 name: feature-spec
-description: The Spec phase of the development flow — write or revise a feature spec. Use the moment a session turns to new functionality, a scoped feature/fix is handed over, or the user asks to update specs — before any planning or code. Never wait to be asked for "the spec phase"; detect it from the conversation.
+description: The Spec phase of the development flow — write or revise a feature spec, ending with a suggested task breakdown the Plan phase verifies. Use the moment a session turns to new functionality, a scoped feature/fix is handed over, or the user asks to update specs — before any planning or code. Never wait to be asked for "the spec phase"; detect it from the conversation.
 ---
 
 # Feature spec (the Spec phase)
@@ -30,6 +30,7 @@ Prose and formatting follow the `documentation-style` skill; these are the spec-
 
 ## Discipline
 
+- **End the spec with a `## Suggested breakdown` section in README.md** — the natural build units the design implies: a title + one-line outcome each, in rough dependency order. No AC, no implementation steps — it's decomposition *input* for the Plan phase, consumed and removed when the catalog lands (`feature-tasks` owns that pass).
 - **Speccing touches only the specs** — never update tasks, code, or other docs to match a revised spec; reconciling them is Plan-phase work (`feature-tasks`).
 - **Ripple every decision change through the whole spec folder in the same pass** — diagrams, error tables, naming, sibling docs. Grep the folder for stale terms before finishing (renamed functions, removed fields, dead error codes).
 - **Keep specs and code in sync** — when later code changes alter documented behavior, the matching spec doc updates in the same change.

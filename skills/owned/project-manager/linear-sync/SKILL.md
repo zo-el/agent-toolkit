@@ -5,7 +5,7 @@ description: Mirror the project's tracked work (a feature's tasks) into a Linear
 
 # Linear sync
 
-Mirror the repo's tracked work into Linear so others can view, track, and shape it. The **repo is the source of truth for the plan**; Linear **owns each task's acceptance criteria** once planned (others suggest, you review). Write titles + AC for a non-technical reader, faithful to the source (per `documentation-style`).
+Mirror the repo's tracked work into Linear so others can view, track, and shape it. The **repo is the source of truth for the plan**; Linear **owns each task's acceptance criteria** once the task is `ready` (others suggest, you review). Write titles + AC for a non-technical reader, faithful to the source (per `documentation-style`).
 
 ## The shape
 
@@ -25,7 +25,7 @@ Before any Linear write, resolve **this project's Linear binding** — a `## Lin
 ## Lifecycle
 
 1. **Plan a round locally** — `specs/<feature>/tasks/` holds the round's tasks, each with draft AC.
-2. **At `ready`** — create the round's **milestone** + its **parent issue**; create each task as an **issue** (with its AC) and make it a **sub-issue** of the parent; then **strip the AC from the task doc** (Linear is now its authority; the doc keeps plan + tests + context + the `**Linear:**` link).
+2. **At `ready`** — create the round's **milestone** + its **parent issue**; create each task as an **issue** (with its AC) and make it a **sub-issue** of the parent; then **strip the AC from the task doc** (Linear is now its authority; the doc keeps context + the `**Linear:**` link, and gains the Developer's plan + test plan at pick-up).
 3. **While implementing** — re-read the issue's AC + comments when you pick a task up and again before closing it; fold any change others made into the plan with the user **before** it's done.
 4. **On done** — move the issue to Done and **paste the as-built plan as a comment**.
 5. **Spec re-plan → a new round** — a re-plan that yields a *new set of tasks* gets a **new milestone + parent**, holding the new/incomplete tasks; already-completed tasks stay in their old round. The **label** spans all rounds; locally the `tasks/` dir is regenerated for the new round.
@@ -40,7 +40,7 @@ On the PM cap at session start, or whenever asked what's out of sync: gather the
 - Each task → an issue in **the project that owns that work**; **shared machinery many services merely *use* lives once**, in the project that owns it — never a task per consumer.
 - **No milestone-less issues.** Every issue lands in a milestone: feature work in its round milestone; miscellaneous / bug work in the project's standing **`Misc & bugs`** catch-all, target-dated **two weeks before the project's target date** (create it on first need; sweep strays into it when found). An issue with no project first needs a project decision.
 - **Area → the binding's existing labels**; **type → Feature / Bug / Improvement**; **weight → the team's estimate**, by scope; **priority only for the high ones**; **cycle** by the cycle rule below; **assignee** left to the user.
-- **Status** (binding's state names): planned → Backlog/Ready · building → In Progress · in review → In-Review/Test · shipped → Done · dropped → Canceled.
+- **Status** (binding's state names): catalogued (`stub`…`ready`) → Backlog/Ready · `planned` (plan written, build imminent) → Ready/Todo · building → In Progress · in review → In-Review/Test · shipped → Done · dropped → Canceled.
 
 ## Cycles — the cycle is each task's *planned* week
 

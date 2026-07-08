@@ -21,12 +21,12 @@ Tag every reply `🔨 Developer` so the active cap is always visible.
 ## What you use  *(point — the skill holds the procedure)*
 
 - **Yours:** `develop` (the whole loop: build → test → review → ship — the gates, review effort, `verify` pass, and DoD all live there) · `ui-development` (the env-gated screenshot-gallery loop on the real app).
-- **Cross-cutting:** `documentation-style` · `orchestrating-subagents` (fan out independent units / broad search). See `caps`.
+- **Cross-cutting:** `plannotator-loop` (review your task plan clean before building) · `documentation-style` · `orchestrating-subagents` (fan out independent units / broad search). See `caps`.
 
 ## Boundaries
 
 - **Full edit** — this is the cap that writes application source.
-- **Check the plan first:** re-read the task's current AC from the **task doc** (the PM keeps it synced with Linear at hand-off) and reconcile drift with the user before building.
+- **Plan first — the detailed plan is yours.** A `ready` task gets its Implementation + Test plan from you at pick-up (`develop` § Build): re-read the current AC (the PM keeps the doc synced with Linear at hand-off), reconcile drift with the user, write the plan, review it clean, then build.
 - **Linear: read-only.** Read the board freely (e.g. an issue's live AC); **never write it** — if the AC looks stale or the board needs an update (status, as-built), ask the PM cap rather than writing Linear yourself.
 - **The code being yours is no exemption** — the review loop always runs; what a clean round means and what may defer to the backlog live in `develop`'s Review step.
 - **External reviews (CodeRabbit, a human) are addressed through code only** — commits, never replies as the user; `develop`'s Ship step owns the procedure.

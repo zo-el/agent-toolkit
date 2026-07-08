@@ -1,11 +1,11 @@
 ---
 name: feature-tasks
-description: The Plan phase of the development flow — break a finished spec into tasks. Use when a spec is ready to plan, when re-planning after a spec change, or when the user asks for tasks or acceptance criteria.
+description: The Plan phase of the development flow — verify the spec's suggested breakdown into a task catalog with acceptance criteria. Use when a spec is ready to plan, when re-planning after a spec change, or when the user asks for tasks or acceptance criteria.
 ---
 
 # Feature tasks (the Plan phase)
 
-Planning breaks the spec into ordered, self-contained tasks in `documentation/specs/<feature>/tasks/NN-<name>.md`.
+Planning turns the spec — and the architect's **Suggested breakdown** in it — into ordered, self-contained tasks in `documentation/specs/<feature>/tasks/NN-<name>.md`. The PM decides the decomposition and owns each task's **AC, scope, and order**; the **detailed plan is the Developer's**, written at pick-up (`develop` § Build).
 
 ## The catalog
 
@@ -23,26 +23,25 @@ Order tasks **build-first, deploy-together**: build tasks land and are reviewed 
 
 A round's catalog is build tasks **plus a testing phase**: after the build tasks, plan the **automated e2e + manual test pass** that proves the round's outcomes together — one task (or a small set) with AC like any other, covering the end-to-end flows and the user-facing checks. Build tasks still carry their own tests (the `develop` gate); the testing phase is the round-level proof, and it precedes any release/deploy task (**build → test → release**). What it surfaces is decided in the round — fixed, tasked, or explicitly accepted — per the `backlog` skill's active-work rule.
 
-## Two-stage planning
+## The catalog pass
 
-1. **Catalog pass** — for the whole feature, create AC-only stubs (Title, Status, AC, 2–3 line context) so the user reviews the breakdown before any deep planning.
-2. **Deep-plan one task at a time** on request — fill Implementation + Test plan, then review via the `plannotator-loop` skill before marking it ready.
+From the spec's **Suggested breakdown**, decide the actual units — merge, split, resequence, drop: the suggestion is input, the catalog is the decision. Write each unit as an AC-stub (Title, Status, AC, 2–3-line context), review the catalog with the user (`plannotator-loop`), and **remove the consumed Suggested-breakdown section from the spec README in the same pass** — the catalog supersedes it. The user flips tasks `ready`; the Developer writes each task's detailed plan at pick-up and flips it `planned` once the plan reviews clean (`develop` § Build).
 
 ## Acceptance criteria — outcomes, not work
 
 - Each criterion is a clear, **testable pass/fail statement of expected behavior** (checklist or Given/When/Then), standing alone, free of implementation detail — the *how* belongs in Implementation.
 - Cover **error and edge states**, not just the happy path (rejections, timeouts, retries, misconfiguration).
 - 3–7 per task; more usually means it should split.
-- **If the project mirrors to Linear** (`linear-sync`): at `ready` the AC moves to the task's Linear issue and is **stripped from the doc** — Linear becomes its sole authority (others suggest, you review); the doc then keeps plan + tests + context + the `**Linear:**` link.
+- **If the project mirrors to Linear** (`linear-sync`): at `ready` the AC moves to the task's Linear issue and is **stripped from the doc** — Linear becomes its sole authority (others suggest, you review); the doc then keeps context + the `**Linear:**` link, and gains the Developer's plan + test plan at pick-up.
 
 ## Task shape
 
 - **Title** — one line: what reaching it achieves.
-- **Status** — one line (`stub` → `AC suggested` → `ready for review` → `ready` → `in development`).
+- **Status** — one line (`stub` → `AC suggested` → `ready for review` → `ready` → `planned` → `in development`).
 - **Acceptance criteria** — at the top (see above).
 - **Summary / context** — what it does, what already exists and survives, why it's needed, preconditions, target repo(s).
-- **Implementation** — ordered steps naming real files. **Ground every step in the actual code first** (read the files, map the full change/rename surface with grep before writing). Show changes as real code — diffs for reshapes, faithful sketches for new code, never pseudo-prose (formatting per `documentation-style`).
-- **Test plan** — each test tier mapped to the AC it proves. **Reuse expensive integration scenarios**: fold new cases into existing scenarios as sub-cases along their timeline; spin up a new scenario only when genuinely unavoidable.
+- **Implementation** — left empty at planning; **the Developer fills it at pick-up** (`develop` § Build).
+- **Test plan** — likewise the Developer's, at pick-up.
 - **Anything else** — open questions, out-of-scope notes, known interim gaps (e.g. "the UI breaks against real backends until its own task lands — accepted because …").
 
 ## Definition of Done

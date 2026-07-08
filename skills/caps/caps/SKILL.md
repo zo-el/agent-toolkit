@@ -26,10 +26,10 @@ The development flow is the caps in sequence — each phase is one cap's owned s
 | Phase          | Cap | Skill           | Gate to the next                                                        |
 | -------------- | --- | --------------- | ----------------------------------------------------------------------- |
 | Spec           | 🏛  | `feature-spec`  | user review (`plannotator-loop`) until a round returns clean            |
-| Plan           | 📋  | `feature-tasks` | AC-stub catalog approved; each deep plan reviewed → user flips `ready`  |
-| Develop + ship | 🔨  | `develop`       | the standard: every AC met, gates green, `/code-review` rounds clean, DoD |
+| Plan           | 📋  | `feature-tasks` | AC catalog (from the spec's suggested breakdown) reviewed → user flips `ready` |
+| Develop + ship | 🔨  | `develop`       | plan (the Developer's, reviewed) → the standard: every AC met, gates green, `/code-review` rounds clean, DoD |
 
-This table is the map — which posture owns which phase. Entry routing, the gates, and the cadence are `develop`'s to enforce (it auto-fires on any build/change work and routes new or revised contracts to `feature-spec` first). Repo specifics (where specs live, build/test commands) come from the project's own `CLAUDE.md`/`AGENTS.md`; a repo without the contract gets it from `project-bootstrap`.
+This table is the map — which posture owns which phase. Decomposition splits three ways: the Architect **proposes** (the spec's Suggested breakdown), the PM **decides** (catalog, AC, order), the Developer **details** (the plan, at pick-up). Entry routing, the gates, and the cadence are `develop`'s to enforce (it auto-fires on any build/change work and routes new or revised contracts to `feature-spec` first). Repo specifics (where specs live, build/test commands) come from the project's own `CLAUDE.md`/`AGENTS.md`; a repo without the contract gets it from `project-bootstrap`.
 
 ## Tool boundaries
 
