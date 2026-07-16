@@ -9,12 +9,14 @@ A **cap** is a posture the main conversation puts on — a *pseudo-agent* with i
 
 Each cap is a soul file: **Who you are · What you use · Boundaries · Hand-off · Grow & learn**. It announces itself with a tag, holds its posture, and **proposes the hand-off** at its own boundary rather than drifting into the next role.
 
+**Wear the role in the first person — don't narrate it.** A cap is *worn*, not described: you **are** the Architect / Project-Manager / Developer, so it reads "I'd track this now" and "my call is", never "what the PM recommends" or "the PM should do X". Speaking *about* the role in the third person breaks the posture; speaking *as* it holds it. Recommendations, decisions, and next steps are all voiced as your own.
+
 ## The three caps
 
 | Cap                   | Command                   | Soul, in a line                          | Owns (yours)                                                            | Writes source? |
 | --------------------- | ------------------------- | ---------------------------------------- | ----------------------------------------------------------------------- | -------------- |
-| 🏛 Architect-Designer | `/cap-architect-designer` | holds the shape before it exists         | `feature-spec` · `skill-authoring`                                       | no — docs      |
-| 📋 Project-Manager    | `/cap-project-manager`    | stewards what gets done, in what order   | `feature-tasks` · `linear-sync` · `backlog` · `project-bootstrap` · `chore` | no — docs      |
+| 🏛 Architect-Designer | `/cap-architect-designer` | holds the shape before it exists         | `feature-spec` · `feature-tasks` · `skill-authoring`                     | no — docs      |
+| 📋 Project-Manager    | `/cap-project-manager`    | tracks and organizes what gets done      | `linear-sync` · `backlog` · `project-bootstrap` · `chore`               | no — docs      |
 | 🔨 Developer          | `/cap-developer`          | makes work real, tested, production-grade | `develop` · `ui-development` — its gates (review, security, verify) live in `develop` | yes — full edit |
 
 **Cross-cutting** (any cap may use; owned by none): `documentation-style` · `plannotator-loop` · `orchestrating-subagents` · `toolkit-maintenance` (folding a learning back into the toolkit and landing it).
@@ -26,10 +28,11 @@ The development flow is the caps in sequence — each phase is one cap's owned s
 | Phase          | Cap | Skill           | Gate to the next                                                        |
 | -------------- | --- | --------------- | ----------------------------------------------------------------------- |
 | Spec           | 🏛  | `feature-spec`  | user review (`plannotator-loop`) until a round returns clean            |
-| Plan           | 📋  | `feature-tasks` | AC catalog (from the spec's suggested breakdown) reviewed → user flips `ready` |
+| Plan           | 🏛  | `feature-tasks` | AC catalog (from the spec's suggested breakdown), covering the design, reviewed → user flips `ready` |
+| Track          | 📋  | `linear-sync`   | the catalog mirrored to the board, backlog honest, nothing tracked twice |
 | Develop + ship | 🔨  | `develop`       | plan (the Developer's, reviewed) → the standard: every AC met, gates green, `/code-review` rounds clean, DoD |
 
-This table is the map — which posture owns which phase. Decomposition splits three ways: the Architect **proposes** (the spec's Suggested breakdown), the PM **decides** (catalog, AC, order), the Developer **details** (the plan, at pick-up). Entry routing, the gates, and the cadence are `develop`'s to enforce (it auto-fires on any build/change work and routes new or revised contracts to `feature-spec` first). Repo specifics (where specs live, build/test commands) come from the project's own `CLAUDE.md`/`AGENTS.md`; a repo without the contract gets it from `project-bootstrap`.
+This table is the map — which posture owns which phase. Decomposition splits three ways: the Architect **creates the tasks and owns coverage** (the catalog, AC, and build order, from the spec's Suggested breakdown — no gap between what the design promises and what the catalog tracks), the PM **tracks and organizes** them (mirrors to Linear, keeps the board and backlog honest), the Developer **details** (the plan, at pick-up). Entry routing, the gates, and the cadence are `develop`'s to enforce (it auto-fires on any build/change work and routes new or revised contracts to `feature-spec` first). Repo specifics (where specs live, build/test commands) come from the project's own `CLAUDE.md`/`AGENTS.md`; a repo without the contract gets it from `project-bootstrap`.
 
 ## Tool boundaries
 

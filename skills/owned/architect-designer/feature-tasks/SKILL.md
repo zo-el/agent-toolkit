@@ -5,7 +5,7 @@ description: The Plan phase of the development flow — verify the spec's sugges
 
 # Feature tasks (the Plan phase)
 
-Planning turns the spec — and the architect's **Suggested breakdown** in it — into ordered, self-contained tasks in `documentation/specs/<feature>/tasks/NN-<name>.md`. The PM decides the decomposition and owns each task's **AC, scope, and order**; the **detailed plan is the Developer's**, written at pick-up (`develop` § Build).
+Planning turns the spec — and its **Suggested breakdown** — into ordered, self-contained tasks in `documentation/specs/<feature>/tasks/NN-<name>.md`. The **Architect** creates the catalog and owns each task's **AC, scope, order, and coverage** (no gap between what the design promises and what the tasks track); the **PM** then tracks and organizes it (mirror to the board, keep it honest — `linear-sync`); the **detailed plan is the Developer's**, written at pick-up (`develop` § Build).
 
 ## The catalog
 
