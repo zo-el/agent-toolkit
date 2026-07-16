@@ -45,7 +45,7 @@ The reverse of mirroring out: read what actually happened and true the board up,
 - Each task → an issue in **the project that owns that work**; **shared machinery many services merely *use* lives once**, in the project that owns it — never a task per consumer.
 - **No milestone-less issues.** Every issue lands in a milestone: feature work in its round milestone; miscellaneous / bug work in the project's standing **`Misc & bugs`** catch-all, target-dated **two weeks before the project's target date** (create it on first need; sweep strays into it when found). An issue with no project first needs a project decision.
 - **Area → the binding's existing labels**; **type → Feature / Bug / Improvement**; **weight → the team's estimate**, by scope; **priority only for the high ones**; **cycle** by the cycle rule below; **assignee** left to the user.
-- **Status** (binding's state names): catalogued (`stub`…`ready`) → Backlog/Ready · `planned` (plan written, build imminent) → Ready/Todo · building → In Progress · in review → In-Review/Test · shipped → Done · dropped → Canceled.
+- **Status** (binding's state names) — **decided work defaults to `Ready`, not Backlog.** A created, scoped task we intend to do → **Ready**, even if it hasn't started, is blocked, or is a later phase (Ready means "decided, not yet in progress" — not "being worked now"). **`Backlog` is only for the undecided** — a rough placeholder or stub whose scope isn't settled, or a maybe that hasn't been committed to. Then: building → **In Progress** · in review → **In-Review/Test** · shipped → **Done** · dropped → **Canceled**.
 
 ## Cycles — the cycle is each task's *planned* week
 
