@@ -67,8 +67,18 @@ else
   : > "$MANIFEST.tmp"
   for a in "$ROOT"/agents/*.md; do
     [ -e "$a" ] || continue
-    cmp -s "$a" "$AGENTS_DST/$(basename "$a")" 2>/dev/null || cp -f "$a" "$AGENTS_DST/$(basename "$a")"
-    basename "$a" >> "$MANIFEST.tmp"
+    n="$(basename "$a")"
+    if ! cmp -s "$a" "$AGENTS_DST/$n" 2>/dev/null; then
+      # A destination we don't already manage is the user's own file — never
+      # clobber it unseen; keep a dated copy before it's replaced.
+      if [ -f "$AGENTS_DST/$n" ] && ! grep -qxF "$n" "$MANIFEST" 2>/dev/null; then
+        mkdir -p "$CLAUDE_DIR/backups/agents"
+        cp "$AGENTS_DST/$n" "$CLAUDE_DIR/backups/agents/$n.$ts"
+        say "  ! kept your existing $n → backups/agents/$n.$ts"
+      fi
+      cp -f "$a" "$AGENTS_DST/$n"
+    fi
+    printf '%s\n' "$n" >> "$MANIFEST.tmp"
   done
   mv "$MANIFEST.tmp" "$MANIFEST"
   # Reap any managed processes whose owning session is gone (cheap, idempotent).
@@ -82,6 +92,13 @@ desired_settings() {
     def clean(a): (a // [])
       | map(select((((.hooks // []) | map(.command // "") | join(" ")) | ours) | not));
     .env = ((.env // {}) + {CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"})
+    # Auto mode: Claude judges each command itself instead of prompting for
+    # everything — so background agents finish their work unattended, and no
+    # hand-maintained list of build/test commands can go stale. It is safe here
+    # only because the guard hooks below fire independently of permission mode
+    # and re-introduce a prompt exactly where it matters (push, PR, comments as
+    # the user, reset --hard, ~/.claude, Linear writes).
+    | .permissions = ((.permissions // {}) + {defaultMode: "auto"})
     | .statusLine = {type: "command", command: ($base + "/hooks/statusline.py"), padding: 0}
     | .hooks.SessionStart = clean(.hooks.SessionStart) + [{
         matcher: "startup|resume|clear",
@@ -187,9 +204,15 @@ fi
 linked="$(find "$CLAUDE_DIR/skills" -maxdepth 1 -type l 2>/dev/null | wc -l | tr -d ' ')"
 have="$(find "$ROOT/skills" -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')"
 [ "$MODE" = "--dry-run" ] || [ "$linked" -ge "$have" ] || warn "only $linked of $have skills are linked — run: $STABLE/install-skills.sh"
-agents_have="$(ls "$ROOT"/agents/*.md 2>/dev/null | wc -l | tr -d ' ')"
-agents_copied="$(ls "$CLAUDE_DIR"/agents/*.md 2>/dev/null | wc -l | tr -d ' ')"
-[ "$MODE" = "--dry-run" ] || [ "$agents_copied" -ge "$agents_have" ] || warn "only $agents_copied of $agents_have agents are installed — run: $STABLE/install.sh"
+# Count only the agents this toolkit owns — the user's own agents in the same
+# directory must not make a missing toolkit agent look green.
+agents_have=0; agents_copied=0
+for a in "$ROOT"/agents/*.md; do
+  [ -e "$a" ] || continue
+  agents_have=$((agents_have + 1))
+  cmp -s "$a" "$CLAUDE_DIR/agents/$(basename "$a")" 2>/dev/null && agents_copied=$((agents_copied + 1))
+done
+[ "$MODE" = "--dry-run" ] || [ "$agents_copied" -ge "$agents_have" ] || warn "only $agents_copied of $agents_have toolkit agents are installed/current — run: $STABLE/install.sh"
 
 if [ "$problems" -eq 0 ]; then
   say "✓ doctor: all checks green ($have skills, hooks wired via $STABLE)"

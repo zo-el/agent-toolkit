@@ -29,4 +29,4 @@ Lead with **one** recommendation: the issue (ID **and** title — IDs never trav
 
 ## Hand off
 
-Flip the chosen task `ready` if it was pre-ready so the developer gets a clean handoff, and end the report with the recommendation in one line — issue ID + title + task-doc path — so the orchestrator can spawn the `developer` agent on it (or the user can just say "build it").
+End the report with the recommendation in one line — issue ID + title + task-doc path — so the orchestrator can spawn the `developer` agent on it (or the user can just say "build it"). If the pick is pre-`ready`, **propose** the flip as part of the returned diff rather than making it: a board write needs the user's approval like any other (two-phase, per `linear-sync` § Discipline).

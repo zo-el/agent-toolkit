@@ -49,7 +49,7 @@ Agent Teams is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`): teammates sha
 ## Coordinate
 
 - **Never two writers in one tree.** Partition by repo/dir, or give parallel writers `isolation: worktree` so each gets its own checkout, or sequence them. Hold your own edits to a repo while an agent writes there.
-- **Cleanup is the agent's job, not yours.** Each role agent owns the shells it starts and stops them before returning; anything long-lived goes through `hooks/spawn-managed.sh` so the reaper (`hooks/reap-managed.sh`, wired at SubagentStop / SessionStart / SessionEnd) can kill whatever a dead session left behind. You should never have to clean up after an agent — if you do, that's a bug in the agent's definition to fold back.
+- **Cleanup is the agent's job, not yours.** Each role agent owns the shells it starts and stops them before returning; anything long-lived goes through `hooks/spawn-managed.sh` so it's registered. The reaper (`hooks/reap-managed.sh`) guarantees only that **nothing outlives the session** — a subagent shares your CLI process, so it cannot clean up after an individual agent that forgot. If you find yourself killing a process an agent left behind, that's a bug in that agent's definition to fold back, not a chore to absorb.
 
 ## The publish gate is yours alone
 

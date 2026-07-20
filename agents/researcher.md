@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Investigates questions that need sources beyond the codebase — web research, library/API evaluation, comparisons, current best practice — and returns a synthesized, cited answer. Read-only, no repo writes. The orchestrator spawns it for "research X", technology choices, or fact-finding the code can't answer. (For in-repo search, the orchestrator uses the built-in Explore agent instead.)
-tools: Read, Glob, Grep, WebFetch, WebSearch, Skill, Agent
+tools: Read, Glob, Grep, WebFetch, WebSearch, Skill, Agent, TaskUpdate, TaskList, TaskGet, SendMessage
 effort: max
 color: cyan
 skills: [deep-research]

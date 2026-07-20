@@ -142,66 +142,86 @@ linear_case ask   mcp__linear__delete_comment
 linear_case ask   mcp__linear__some_future_verb
 check guard-linear.sh allow '{"tool_name":"Bash","tool_input":{"command":"ls"}}' 'non-linear tool untouched'
 
-# ── spawn-managed + reap-managed: dead-owner procs reaped, live/unknown spared ──
-fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
-p_dead_owner="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=gone-session "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
-p_live_owner="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=live-session "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
-p_unknown="$(HOME="$fh" CLAUDE_CODE_SESSION_ID= "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
-printf '{"pid":99999999,"session":"s","cmd":"x","started":"t"}' > "$fh/.claude/managed-procs/99999999.json"
-printf '{"pid":%d,"sessionId":"live-session"}' "$$" > "$fh/.claude/sessions/$$.json"
-HOME="$fh" "$root/hooks/reap-managed.sh"; HOME="$fh" "$root/hooks/reap-managed.sh"
-for i in 1 2 3 4 5; do kill -0 "$p_dead_owner" 2>/dev/null || break; sleep 0.2; done
-if ! kill -0 "$p_dead_owner" 2>/dev/null && [ ! -e "$fh/.claude/managed-procs/$p_dead_owner.json" ]; then
-  pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL reap-managed   dead-owner process not reaped"
+# ── spawn-managed + reap-managed: ownership is the owning CLI process ──
+# Entries are hand-built so each rule is proven in isolation; ownership is a
+# (pid, kernel start time) pair, never a session id.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
+st_of() { sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'; }
+spawn_sleep() { setsid sleep 300 >/dev/null 2>&1 & echo $!; }
+entry() { # $1 pid, $2 owner_pid, $3 owner_start, $4 starttime-override("" = real)
+  local s="${4:-$(st_of "$1")}"
+  jq -n --argjson pid "$1" --arg st "$s" --arg op "$2" --arg os "$3" \
+    '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os}' \
+    > "$fh/.claude/managed-procs/$1.json"
+}
+reap() { HOME="$fh" "$root/hooks/reap-managed.sh"; }
+alive() { kill -0 "$1" 2>/dev/null; }
+
+dead_owner="$(sh -c 'echo $$')"          # exited immediately → a dead pid
+p_dead="$(spawn_sleep)";    entry "$p_dead"    "$dead_owner" ""
+p_live="$(spawn_sleep)";    entry "$p_live"    "$$"          "$(st_of $$)"
+p_noowner="$(spawn_sleep)"; entry "$p_noowner" ""            ""
+p_recycled="$(spawn_sleep)"; entry "$p_recycled" "$dead_owner" "" "1"   # start time mismatch
+entry 99999999 "$dead_owner" ""                                        # pid long gone
+
+reap; reap
+for i in 1 2 3 4 5; do alive "$p_dead" || break; sleep 0.2; done
+
+if ! alive "$p_dead" && [ ! -e "$fh/.claude/managed-procs/$p_dead.json" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   dead-owner process not reaped"
 fi
-if kill -0 "$p_live_owner" 2>/dev/null; then pass=$((pass + 1)); else
+if alive "$p_live"; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL reap-managed   live-owner process was killed"
 fi
-if kill -0 "$p_unknown" 2>/dev/null; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL reap-managed   unknown-owner process was killed (must be fail-safe)"
+if alive "$p_noowner"; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   unowned process was killed (must be fail-safe)"
+fi
+if alive "$p_recycled" && [ ! -e "$fh/.claude/managed-procs/$p_recycled.json" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   recycled pid must be pruned WITHOUT signalling"
 fi
 if [ ! -e "$fh/.claude/managed-procs/99999999.json" ]; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL reap-managed   dead-pid entry not pruned"
 fi
-kill "$p_live_owner" "$p_unknown" 2>/dev/null; rm -rf "$fh"
+kill "$p_live" "$p_noowner" "$p_recycled" 2>/dev/null; rm -rf "$fh"
 
-# ── reap-managed fail-safe: no sessions registry → never kill (liveness unknowable) ──
-fh="$(mktemp -d)"
-p_nosessions="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=gone-session "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+# ── a session id that rotates (/clear, /resume) must NOT cost a live process ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
+p_rotate="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
+jq -n --argjson pid "$p_rotate" --arg st "$(sed 's/.*) //' /proc/$p_rotate/stat | awk '{print $20}')" \
+  --arg op "$$" --arg os "$(sed 's/.*) //' /proc/$$/stat | awk '{print $20}')" \
+  --arg session "an-old-rotated-away-session-id" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os, session:$session}' \
+  > "$fh/.claude/managed-procs/$p_rotate.json"
 HOME="$fh" "$root/hooks/reap-managed.sh"; HOME="$fh" "$root/hooks/reap-managed.sh"
-if kill -0 "$p_nosessions" 2>/dev/null; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL reap-managed   killed a process with NO sessions registry (must fail safe)"
+if kill -0 "$p_rotate" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   killed a live owner's process after its session id rotated"
 fi
-kill "$p_nosessions" 2>/dev/null; rm -rf "$fh"
+kill "$p_rotate" 2>/dev/null; rm -rf "$fh"
 
-# ── reap-managed: recycled pid (start time mismatch) is pruned, never signalled ──
-fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs" "$fh/.claude/sessions"
-p_innocent="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
-printf '{"pid":%d,"session":"gone-session","starttime":"1"}' "$p_innocent" > "$fh/.claude/managed-procs/$p_innocent.json"
-printf '{"pid":%d,"sessionId":"live-session"}' "$$" > "$fh/.claude/sessions/$$.json"
-HOME="$fh" "$root/hooks/reap-managed.sh"; HOME="$fh" "$root/hooks/reap-managed.sh"
-if kill -0 "$p_innocent" 2>/dev/null && [ ! -e "$fh/.claude/managed-procs/$p_innocent.json" ]; then
-  pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL reap-managed   recycled-pid entry must be pruned WITHOUT signalling the process"
-fi
-kill "$p_innocent" 2>/dev/null; rm -rf "$fh"
-
-# ── reap-managed: TERM is not escalated to KILL inside the grace window ──
-fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
-p_grace="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=gone-session "$root/hooks/spawn-managed.sh" -- sh -c 'trap "" TERM; sleep 300' | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
-printf '{"pid":%d,"sessionId":"live-session"}' "$$" > "$fh/.claude/sessions/$$.json"
+# ── TERM is not escalated to KILL inside the grace window ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
+p_grace="$(setsid sh -c 'trap "" TERM; sleep 300' >/dev/null 2>&1 & echo $!)"
+dead_owner2="$(sh -c 'echo $$')"
+jq -n --argjson pid "$p_grace" --arg st "$(sed 's/.*) //' /proc/$p_grace/stat | awk '{print $20}')" \
+  --arg op "$dead_owner2" --arg os "" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os}' \
+  > "$fh/.claude/managed-procs/$p_grace.json"
 HOME="$fh" "$root/hooks/reap-managed.sh"; sleep 0.3; HOME="$fh" "$root/hooks/reap-managed.sh"
 if kill -0 "$p_grace" 2>/dev/null; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL reap-managed   SIGKILLed inside the grace window (no time to shut down)"
 fi
 kill -KILL -- "-$p_grace" 2>/dev/null; rm -rf "$fh"
 
-# ── spawn-managed: a command with quotes/backslashes/newlines stays valid JSON ──
-fh="$(mktemp -d)"
-p_json="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=s "$root/hooks/spawn-managed.sh" -- sh -c 'sleep 300 # a "quoted" \back\slash
-newline' | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+# ── spawn-managed: tricky command stays valid JSON; owner recorded from ancestry ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
+printf '{"pid":%d,"sessionId":"s"}' "$$" > "$fh/.claude/sessions/$$.json"
+p_json="$(HOME="$fh" "$root/hooks/spawn-managed.sh" -- sh -c 'sleep 300 # a "quoted" \back\slash
+newline' | sed -n 's/^managed pid \([0-9]*\).*/\1/p')"
 if jq -e '.pid' "$fh/.claude/managed-procs/$p_json.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL spawn-managed  registry entry is not valid JSON for a tricky command"
+fi
+if [ "$(jq -r '.owner_pid' "$fh/.claude/managed-procs/$p_json.json" 2>/dev/null)" = "$$" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL spawn-managed  owner CLI pid not discovered from process ancestry"
 fi
 kill -KILL -- "-$p_json" 2>/dev/null; kill "$p_json" 2>/dev/null; rm -rf "$fh"
 
