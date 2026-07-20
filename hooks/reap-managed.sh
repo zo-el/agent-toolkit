@@ -1,30 +1,41 @@
 #!/usr/bin/env bash
 # Reaper for spawn-managed.sh processes — the safety net under each agent's own
-# cleanup discipline. Wired at SubagentStop / SessionEnd / SessionStart.
+# cleanup discipline. Wired at SessionEnd / SessionStart / SubagentStop.
 #
-# What it guarantees: **nothing registered outlives the Claude session that
-# started it.** A process whose owning CLI process is gone gets TERM, then KILL
-# once a grace window has passed. It does NOT reap per-subagent — a subagent
-# shares its parent's CLI process, so a server a subagent leaks lives until the
-# session ends; stopping it before returning is the agent's own job (that is
-# why every agent definition carries the discipline).
+# Two ways a managed process becomes reapable, because neither alone is enough:
+#   1. Its owning CLI process is gone (crash, kill -9, machine restart). Only a
+#      LATER session can observe this — at SessionEnd the CLI is still alive, by
+#      construction, since the hook runs as its child.
+#   2. The session that registered it is ending right now — SessionEnd passes
+#      its own session_id on stdin, so the graceful path is handled at the
+#      moment it happens rather than deferred to the next startup.
 #
-# Fail-safe in every direction it cannot be sure of — it would rather leak a
-# process than kill live work:
-#   - no jq                        → do nothing
-#   - entry has no owner recorded  → never signalled, only pruned once dead
-#   - our start time missing or changed (pid recycled) → prune, never signal
-#   - owner alive, or owner's own start time changed   → spare
+# Fail-safe wherever it cannot be sure — it would rather leak a process than
+# kill live work:
+#   - no jq                                   → do nothing
+#   - our start time missing/changed (recycled pid) → prune, never signal
+#   - no owner recorded and not the ending session  → never signalled
+#   - owner alive, or its start time unreadable     → spare (only a definite
+#     mismatch means the pid was recycled and the real owner is gone)
+# Escalation is TERM, then KILL on a later pass once GRACE has elapsed.
 # Linux (/proc).
 set -uo pipefail
 
 reg="$HOME/.claude/managed-procs"
+input="$(cat 2>/dev/null || true)"
 [ -d "$reg" ] || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
 GRACE=10   # seconds a TERMed process gets to exit before KILL
 
 starttime_of() { sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'; }
+
+# A session ending now takes its own managed processes with it.
+ending=""
+if [ -n "$input" ] \
+   && [ "$(printf '%s' "$input" | jq -r '.hook_event_name // empty' 2>/dev/null)" = "SessionEnd" ]; then
+  ending="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)"
+fi
 
 now="$(date +%s)"
 
@@ -34,6 +45,7 @@ for e in "$reg"/*.json; do
   st="$(jq -r '.starttime // empty' "$e" 2>/dev/null)"
   opid="$(jq -r '.owner_pid // empty' "$e" 2>/dev/null)"
   ostart="$(jq -r '.owner_start // empty' "$e" 2>/dev/null)"
+  sess="$(jq -r '.session // empty' "$e" 2>/dev/null)"
   [ -n "$pid" ] || { rm -f "$e"; continue; }
 
   # Process already gone → drop the entry (and any term marker).
@@ -48,15 +60,25 @@ for e in "$reg"/*.json; do
     continue
   fi
 
-  # No owner recorded → never kill proactively.
-  [ -n "$opid" ] || continue
-
-  # Owner still alive (same process, not a recycled pid) → in use, spare it.
-  if kill -0 "$opid" 2>/dev/null; then
-    [ -z "$ostart" ] || [ "$ostart" = "$(starttime_of "$opid")" ] && continue
+  reap=0
+  if [ -n "$opid" ]; then
+    if ! kill -0 "$opid" 2>/dev/null; then
+      reap=1                                   # owning CLI is gone
+    else
+      ostart_now="$(starttime_of "$opid")"
+      # Spare unless we can POSITIVELY show the pid was recycled: an unreadable
+      # start time is uncertainty, and uncertainty must never kill.
+      if [ -n "$ostart" ] && [ -n "$ostart_now" ] && [ "$ostart" != "$ostart_now" ]; then
+        reap=1
+      fi
+    fi
   fi
+  if [ -n "$ending" ] && [ -n "$sess" ] && [ "$sess" = "$ending" ]; then
+    reap=1                                     # this session is ending now
+  fi
+  [ "$reap" -eq 1 ] || continue
 
-  # Owning session is gone: TERM once, KILL only after the grace window.
+  # TERM once, KILL only after the grace window has passed.
   if [ -f "$reg/$pid.term" ]; then
     termed="$(cat "$reg/$pid.term" 2>/dev/null || echo 0)"
     case "$termed" in ''|*[!0-9]*) termed=0 ;; esac

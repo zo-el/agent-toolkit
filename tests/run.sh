@@ -212,6 +212,74 @@ if kill -0 "$p_grace" 2>/dev/null; then pass=$((pass + 1)); else
 fi
 kill -KILL -- "-$p_grace" 2>/dev/null; rm -rf "$fh"
 
+# ── the kill-vs-spare branch: uncertainty spares, only a positive mismatch reaps ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
+# (a) live owner, start time NOT recorded → unverifiable → must be SPARED
+p_unverif="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
+jq -n --argjson pid "$p_unverif" --arg st "$(sed 's/.*) //' /proc/$p_unverif/stat | awk '{print $20}')" \
+  --arg op "$$" --arg os "" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os}' \
+  > "$fh/.claude/managed-procs/$p_unverif.json"
+# (b) live owner pid, but a DIFFERENT process than recorded → pid recycled → reap
+p_recyc_owner="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
+jq -n --argjson pid "$p_recyc_owner" --arg st "$(sed 's/.*) //' /proc/$p_recyc_owner/stat | awk '{print $20}')" \
+  --arg op "$$" --arg os "999999999" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os}' \
+  > "$fh/.claude/managed-procs/$p_recyc_owner.json"
+HOME="$fh" "$root/hooks/reap-managed.sh" </dev/null
+for i in 1 2 3 4 5; do kill -0 "$p_recyc_owner" 2>/dev/null || break; sleep 0.2; done
+if kill -0 "$p_unverif" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   killed a LIVE owner's process when its start time was unverifiable"
+fi
+if ! kill -0 "$p_recyc_owner" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   owner pid recycled (start time mismatch) — process should be reaped"
+fi
+kill "$p_unverif" "$p_recyc_owner" 2>/dev/null; rm -rf "$fh"
+
+# ── SessionEnd reaps the ending session's own processes (owner still alive) ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
+p_ending="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
+jq -n --argjson pid "$p_ending" --arg st "$(sed 's/.*) //' /proc/$p_ending/stat | awk '{print $20}')" \
+  --arg op "$$" --arg os "$(sed 's/.*) //' /proc/$$/stat | awk '{print $20}')" --arg sess "ending-sess" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os, session:$sess}' \
+  > "$fh/.claude/managed-procs/$p_ending.json"
+printf '{"hook_event_name":"SessionEnd","session_id":"ending-sess"}' \
+  | HOME="$fh" "$root/hooks/reap-managed.sh"
+for i in 1 2 3 4 5; do kill -0 "$p_ending" 2>/dev/null || break; sleep 0.2; done
+if ! kill -0 "$p_ending" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   SessionEnd did not reap the ending session's process"
+fi
+# …and a DIFFERENT session ending must not touch it
+p_other="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
+jq -n --argjson pid "$p_other" --arg st "$(sed 's/.*) //' /proc/$p_other/stat | awk '{print $20}')" \
+  --arg op "$$" --arg os "$(sed 's/.*) //' /proc/$$/stat | awk '{print $20}')" --arg sess "mine" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os, session:$sess}' \
+  > "$fh/.claude/managed-procs/$p_other.json"
+printf '{"hook_event_name":"SessionEnd","session_id":"someone-elses"}' \
+  | HOME="$fh" "$root/hooks/reap-managed.sh"
+if kill -0 "$p_other" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   another session ending killed our process"
+fi
+kill "$p_other" 2>/dev/null; rm -rf "$fh"
+
+# ── end-to-end: a REAL spawn-managed entry survives a reap pass (schema contract) ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
+printf '{"pid":%d,"sessionId":"s"}' "$$" > "$fh/.claude/sessions/$$.json"
+p_e2e="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=s "$root/hooks/spawn-managed.sh" -- sleep 300 \
+  | sed -n 's/^managed pid \([0-9]*\).*/\1/p')"
+HOME="$fh" "$root/hooks/reap-managed.sh" </dev/null
+if kill -0 "$p_e2e" 2>/dev/null && [ -e "$fh/.claude/managed-procs/$p_e2e.json" ]; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   writer/reader schema mismatch — real entry mis-handled"
+fi
+# and SessionEnd for that same session does reap it
+printf '{"hook_event_name":"SessionEnd","session_id":"s"}' | HOME="$fh" "$root/hooks/reap-managed.sh"
+for i in 1 2 3 4 5; do kill -0 "$p_e2e" 2>/dev/null || break; sleep 0.2; done
+if ! kill -0 "$p_e2e" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   real spawn-managed entry not reaped at its SessionEnd"
+fi
+kill "$p_e2e" 2>/dev/null; rm -rf "$fh"
+
 # ── spawn-managed: tricky command stays valid JSON; owner recorded from ancestry ──
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
 printf '{"pid":%d,"sessionId":"s"}' "$$" > "$fh/.claude/sessions/$$.json"

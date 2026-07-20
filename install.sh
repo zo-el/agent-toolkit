@@ -81,8 +81,20 @@ else
     printf '%s\n' "$n" >> "$MANIFEST.tmp"
   done
   mv "$MANIFEST.tmp" "$MANIFEST"
+  # One-time migration: entries written before ownership was re-keyed carry no
+  # owner_pid, so the reaper can never judge them and would skip them forever.
+  # Drop the records (never signal a process of unknown provenance) — anything
+  # still running simply becomes unmanaged, which is where it started.
+  legacy=0
+  for m in "$CLAUDE_DIR"/managed-procs/*.json; do
+    [ -e "$m" ] || continue
+    if command -v jq >/dev/null 2>&1 && [ -z "$(jq -r '.owner_pid // empty' "$m" 2>/dev/null)" ]; then
+      rm -f "$m"; legacy=$((legacy + 1))
+    fi
+  done
+  [ "$legacy" -eq 0 ] || say "  ! dropped $legacy pre-upgrade managed-process record(s) — never signalled"
   # Reap any managed processes whose owning session is gone (cheap, idempotent).
-  "$ROOT/hooks/reap-managed.sh" 2>/dev/null || true
+  "$ROOT/hooks/reap-managed.sh" </dev/null 2>/dev/null || true
 fi
 
 # ── 3. settings.json: statusline + hooks on the stable path ─────────────────
