@@ -1,16 +1,30 @@
 # agent-toolkit
 
-My portable agent tool set in two tiers: the **always-on principles** I work by ([`core.md`](core.md)) and the **task-specific procedures** for speccing, planning, and development, codified as [Claude Code skills](https://docs.claude.com/en/docs/claude-code). Both apply automatically in any project.
+My portable agent tool set in three tiers: the **always-on principles** I work by ([`core.md`](core.md)), the **role agents** the session orchestrates ([`agents/`](agents/)), and the **task-specific procedures** they follow, codified as [Claude Code skills](https://docs.claude.com/en/docs/claude-code). All apply automatically in any project.
 
 Grown out of the [unyt workshop](https://github.com/unytco) — the workshop's `documentation/DEVELOPMENT_WORKFLOW.md` + `SPEC_DISCIPLINE.md` are the reference implementation of these patterns; the skills here are their project-independent form.
 
+## The model — one orchestrator, role agents
+
+The session itself is the **orchestrator** (`core.md`): it decomposes work, spawns the role agents, consolidates their results, and is the only one that talks to the user or publishes. Each agent runs in its own isolated context, with a `tools:` allowlist as its outer limit and its definition as the role it keeps inside that limit:
+
+| Agent | Runs | Tools it does **not** have | Role discipline |
+| --- | --- | --- | --- |
+| 🏛 [`architect-designer`](agents/architect-designer.md) | `feature-spec` → `feature-tasks` (spec + task catalog + AC, owns coverage) | no Linear, no Task | writes docs + tasks, never application source |
+| 📋 [`project-manager`](agents/project-manager.md) | `linear-sync` · `next-up` · `backlog` (track, organize, surface) | — (**the only agent with Linear**) | tracks; never authors tasks/AC or builds |
+| 🔨 [`developer`](agents/developer.md) | `develop` · `ui-development` (build → test → self-review loop, ship-ready) | no Linear | full edit; never pushes or posts |
+| 🔍 [`reviewer`](agents/reviewer.md) | `/code-review` · `/security-review` on demand (independent scrutiny) | **no Write/Edit**, no Linear | reports ranked findings; never patches |
+| 🔬 [`researcher`](agents/researcher.md) | `deep-research` (web/external questions, cited answers) | **no Write/Edit**, no Linear | answers with citations; no repo changes |
+
+Honest about the layering: the allowlist is the hard boundary (the reviewer genuinely *cannot* call Edit; only the PM *has* Linear tools), while "never writes source", "never pushes" are role discipline in each definition — backed by the guard hooks, which fire inside subagents too. Agents that need `Bash` to do their job (build, test, reproduce a finding) could in principle write through it; the gates above are what make that a violation rather than an accident.
+
+The built-ins (`Explore`, `Plan`, `general-purpose`) cover generic search/planning — the custom roles exist for the skills and boundaries above, and every agent cleans up its own processes ([`hooks/spawn-managed.sh`](hooks/spawn-managed.sh) + [`hooks/reap-managed.sh`](hooks/reap-managed.sh) guarantee it). The full playbook — when to delegate, briefs, the Agent Teams task board, worktree isolation — is the `orchestrating-subagents` skill.
+
 ## Core vs. skills
 
-Two tiers, matching how Claude Code loads them:
-
-- **[`core.md`](core.md) — always-on principles.** Imported by this repo's [`CLAUDE.md`](CLAUDE.md), so it's in context every session and every task: how to work (simple-but-finished, production focus, reuse, verify against reality, sweep on rename, one-home) and the git guardrails (publishing — push / PR / public comment — gated on a shown plan + explicit go-ahead; never post as the user; no AI attribution). Small and stable — principles, not procedures — so they apply during a chore or a one-line edit just as much as a feature.
+- **[`core.md`](core.md) — always-on principles.** Imported by this repo's [`CLAUDE.md`](CLAUDE.md), so it's in context every session and every task: the orchestrator stance, how to work (simple-but-finished, production focus, reuse, verify against reality, sweep on rename, one-home) and the git guardrails (publishing — push / PR / public comment — gated on a shown plan + explicit go-ahead; never post as the user; no AI attribution). Small and stable — principles, not procedures.
 - **[`skills/`](skills/) — on-demand procedures and reference.** Each a self-describing `SKILL.md` whose `description` frontmatter is the auto-trigger; the body loads only when it's relevant. **The skills are their own catalog** — the tree under [`skills/`](skills/) is the list (the snippet below prints it), adding one needs no edit here. They cover:
-  - **Development flow** — spec → plan → develop (build → test → self-review loop → ship), mapped to skills and postures by `caps`; each phase skill fires on its own mid-flow.
+  - **Development flow** — spec → plan → develop (build → test → self-review loop → ship), mapped to agents and skills by `orchestrating-subagents`; each phase skill fires on its own mid-flow.
   - **Work tracking** — chosen by what the work *is*: a **feature** (the workflow above), a **chore** (a maintenance execution doc), a **backlog** item (the unscheduled queue).
   - **Review loops** — iterative rounds until one comes back clean: one for documents/plans, one for UI development (screenshot galleries of the real app).
   - **Writing style** — how code comments, markdown, and changelogs should read; applied by type whenever you write or edit them.
@@ -36,9 +50,10 @@ git clone git@github.com:zo-el/agent-toolkit.git && cd agent-toolkit
 [`install.sh`](install.sh) wires everything through the **stable path `~/.claude/agent-toolkit`** — a symlink it owns — so device config never embeds a checkout path: move the repo, re-run `./install.sh` from the new location, and only the symlink changes. It:
 
 - symlinks every skill into `~/.claude/skills` ([`install-skills.sh`](install-skills.sh), also re-runnable on its own);
-- points `statusLine` and all hooks in `~/.claude/settings.json` at [`hooks/`](hooks/) — a jq merge that replaces toolkit-managed entries, preserves everything else, and backs the original up to `~/.claude/backups/` first;
+- **copies** every agent into `~/.claude/agents/` (copied, not symlinked — the agents file-watcher doesn't reliably follow symlinks; a manifest prunes renamed/removed ones without touching your own agents);
+- points `statusLine` and all hooks in `~/.claude/settings.json` at [`hooks/`](hooks/) — a jq merge that replaces toolkit-managed entries, preserves everything else, and backs the original up to `~/.claude/backups/` first — and sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (the shared task list / teammate coordination layer the orchestrator uses);
 - writes the one-line device pointer `~/.claude/CLAUDE.md` → the toolkit's [`CLAUDE.md`](CLAUDE.md) (whose import chain pulls in `core.md`);
-- runs a doctor: every wired path must exist and be executable.
+- runs a doctor: every wired path must exist and be executable, agents fully copied.
 
 **It never goes stale by itself.** `SessionStart` re-runs `install.sh --sync` (symlink + skills + doctor) at every session start — new skills pulled from another machine are live by the next session, and a broken install prints its diagnosis into the session context, where the agent will see and surface it. A `PostToolUse` hook re-syncs the moment a skill file is edited ([`hooks/sync-on-skill-edit.sh`](hooks/sync-on-skill-edit.sh), path-gated so unrelated edits don't trigger it).
 
@@ -55,16 +70,18 @@ command -v claude >/dev/null && claude plugin install skill-creator@claude-plugi
 - [`hooks/guard-git.sh`](hooks/guard-git.sh) (PreToolUse · Bash) — **denies** public words under the user's identity (`gh pr/issue comment`, `gh pr review`, mutating comment/review API calls) and **forces an approval prompt** for publishing (`git push`, `gh pr create/merge/…`, package publish) and destructive or device state (`reset --hard` / `clean -f` / `filter-branch`, recursive `rm` outside the workspace, shell writes into `~/.claude`, global installs, `sudo`, cron/service edits) — while local git workflow (commits, branches, rebases, tags) stays free: the push ask is the review point.
 - [`hooks/guard-config.sh`](hooks/guard-config.sh) (PreToolUse · Write/Edit) — approval prompt for device config (`~/.claude/*`, `~/.gitconfig`, `/etc/*`) and for the guard hooks themselves. Claude's own memory (`~/.claude/projects/**`), backups, and paths that resolve into a repo workspace stay open; paths are realpath-resolved so a symlink can't dodge the gate in either direction.
 - [`hooks/format-on-edit.sh`](hooks/format-on-edit.sh) (PostToolUse, async) — auto-formats every file as it's written: rustfmt always, prettier only where the project carries a prettier config, black when installed.
+- [`hooks/spawn-managed.sh`](hooks/spawn-managed.sh) + [`hooks/reap-managed.sh`](hooks/reap-managed.sh) (SubagentStop / SessionStart / SessionEnd) — no orphaned processes, ever: long-lived background processes are registered at spawn, and anything whose owning session has died is reaped (TERM, then KILL); live sessions' processes are never touched. A subagent's raw `nohup … &` would otherwise outlive it, reparented to init — verified.
+- These guard hooks fire **inside subagents too**, so an agent's stray `git push` still hits the approval gate — belt-and-suspenders with each agent's `tools:` allowlist.
 
 Layering, honestly: these hooks are the *policy* layer and fail open if `jq` is missing (the doctor flags that). For a hard wall beneath them, enable Claude Code's native OS sandbox (`/sandbox`, bubblewrap) — it blocks stray writes at the kernel level, including to `settings.json` itself.
 
 ## Statusline
 
-[`hooks/statusline.py`](hooks/statusline.py) (python3, stdlib-only — no npm/node at render time) shows, at all times: active cap chip · model (+`1M` context marker) · reasoning effort · context bar and % · session cost and lines changed · rate-limit usage · git branch+dirty · directory. It reads the native statusline JSON fields first (`effort.level`, `context_window.*`, Claude Code ≥ 2.1.119) and falls back to transcript + settings scanning on older versions; every segment fails silent — the line itself never breaks.
+[`hooks/statusline.py`](hooks/statusline.py) (python3, stdlib-only — no npm/node at render time) shows, at all times: model (+`1M` context marker) · reasoning effort · context bar and % · session cost and lines changed · rate-limit usage · git branch+dirty · directory. It reads the native statusline JSON fields first (`effort.level`, `context_window.*`, Claude Code ≥ 2.1.119) and falls back to transcript + settings scanning on older versions; every segment fails silent — the line itself never breaks.
 
 ## Layout & lifecycle
 
-- Always-on principles live in [`core.md`](core.md) (imported by [`CLAUDE.md`](CLAUDE.md)); each task procedure is one directory under [`skills/`](skills/) with a single `SKILL.md` (frontmatter `name` + `description` — the description is the auto-trigger).
+- Always-on principles live in [`core.md`](core.md) (imported by [`CLAUDE.md`](CLAUDE.md)); each role agent is one `agents/<role>.md` (frontmatter `tools`/`effort`/`skills` + a system-prompt body); each task procedure is one directory under [`skills/`](skills/) with a single `SKILL.md` (frontmatter `name` + `description` — the description is the auto-trigger).
 - Home: [`zo-el/agent-toolkit`](https://github.com/zo-el/agent-toolkit), a standalone repo — it serves the whole ecosystem, not any one project. The checkout can live at any path (currently `git_repo/personal/agent-toolkit`); device config reaches it only through the `~/.claude/agent-toolkit` symlink, so moving it again is a one-command repair (`./install.sh`). Deliberately not a submodule of anything: consumers are the `~/.claude` symlinks, not any project's build, so a pin would only drift.
 - Division of labor: [`CLAUDE.md`](CLAUDE.md) (imported by a one-line device pointer at `~/.claude/CLAUDE.md`) describes the toolkit and imports [`core.md`](core.md); **`core.md`** holds the always-on principles (including the never-push / no-attribution guardrails); **the skills** hold task procedures; **per-project docs** (written by `project-bootstrap`) hold each repo's visible contract. A session learning is codified into `core.md` (a principle) or a skill (a procedure), never duplicated into device config or repos.
 - Future: package as a Claude Code plugin if the set ever needs versioned distribution beyond symlinks.

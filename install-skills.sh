@@ -11,7 +11,7 @@ dest="$HOME/.claude/skills"
 mkdir -p "$dest"
 
 # Symlink every skill — any dir containing a SKILL.md, at ANY depth. Skills are
-# grouped into caps/ owned/ cross-cutting/ subfolders for legibility but land
+# grouped into owned/ cross-cutting/ subfolders for legibility but land
 # flat in ~/.claude/skills so Claude discovers them; basenames are unique across
 # the tree. -sfn: replace an existing link and don't descend into a linked dir,
 # so a moved/renamed skill repoints cleanly instead of nesting under the old link.

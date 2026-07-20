@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 """statusLine command — everything you need to know at a glance, one line:
 
-    cap │ model │ effort │ context bar │ cost │ git branch │ dir
+    model │ effort │ context bar │ cost │ limits │ git branch │ dir
 
 Reads the status JSON Claude Code pipes to stdin. Each segment is wrapped in
 its own try/except and degrades to nothing — a statusline must never crash or
 show a stack trace. stdlib only (python3), no jq/node dependency.
 
 Sources, most-authoritative first:
-- stdin JSON: model, cwd, session_id, transcript_path, cost totals — and any
-  native effort/context fields a future Claude Code version adds (probed by
-  name, used when present).
+- stdin JSON: model, cwd, transcript_path, cost totals — and any native
+  effort/context fields a future Claude Code version adds (probed by name,
+  used when present).
 - transcript JSONL: last assistant `usage` block = live context load; the
   latest "Set effort level to X" line = session effort override. Only the tail
   (and, for effort, the head) is scanned so multi-MB transcripts stay cheap; a
   mid-file /effort change in a >3 MB transcript can be missed until the next
   change — accepted trade-off.
-- ~/.claude/settings.json: persisted effortLevel default; per-session cap file
-  ~/.claude/.active-cap-<session_id> written by cap-set.sh.
+- ~/.claude/settings.json: persisted effortLevel default.
 """
 import json
 import os
@@ -42,14 +41,6 @@ EFFORT_STYLE = {
     "max": COLORS["magenta"] + BOLD, "xhigh": COLORS["red"],
     "high": COLORS["yellow"], "medium": COLORS["cyan"], "low": DIM,
 }
-CAP_STYLE = {
-    "cap-architect-designer": (COLORS["blue"], "🏛 Architect-Designer"),
-    "cap-project-manager": (COLORS["yellow"], "📋 Project-Manager"),
-    "cap-developer": (COLORS["green"], "🔨 Developer"),
-    "off": (DIM, "○ cap off"),
-}
-
-
 def read_chunks(path):
     """(tail, head) text chunks of the transcript; head empty if file fits in tail."""
     size = os.path.getsize(path)
@@ -61,18 +52,6 @@ def read_chunks(path):
         f.seek(0)
         head = f.read(HEAD_BYTES).decode("utf-8", "replace")
     return tail, head
-
-
-def segment_cap(data):
-    sid = data.get("session_id") or ""
-    path = os.path.join(HOME, ".claude", f".active-cap-{sid}" if sid else ".active-cap")
-    try:
-        with open(path) as f:
-            cap = f.read().strip()
-    except OSError:
-        cap = ""
-    color, label = CAP_STYLE.get(cap, (DIM, "○ no cap"))
-    return f"{color}{label}{RESET}"
 
 
 def segment_model(data):
@@ -248,7 +227,6 @@ def main():
     cwd = (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or os.getcwd()
     segments = []
     for build in (
-        lambda: segment_cap(data),
         lambda: segment_model(data),
         lambda: segment_effort(data, tail, head),
         lambda: segment_context(data, tail),

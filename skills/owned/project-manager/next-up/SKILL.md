@@ -1,11 +1,11 @@
 ---
 name: next-up
-description: Say what to work on next from the Linear board — the ready, unblocked tasks in dependency + milestone-date + priority order — and recommend the next pickup with its task-doc path, then offer the Developer-cap hand-off. Use when the user asks what's next / what should we work on / what's ready to build / what's in line, and right after a board audit. Reads the board; run `linear-sync`'s board audit first if statuses might be stale.
+description: Say what to work on next from the Linear board — the ready, unblocked tasks in dependency + milestone-date + priority order — and recommend the next pickup with its task-doc path, ready to hand to the developer agent. Use when the user asks what's next / what should we work on / what's ready to build / what's in line, and right after a board audit. Reads the board; run `linear-sync`'s board audit first if statuses might be stale.
 ---
 
 # Next up
 
-The PM's forward look: from a *true* board, name the right next thing and why. If statuses might be stale, run `linear-sync`'s board audit first — recommending off a wrong board points at the wrong work.
+The project-manager's forward look: from a *true* board, name the right next thing and why. If statuses might be stale, run `linear-sync`'s board audit first — recommending off a wrong board points at the wrong work.
 
 ## The pickable set
 
@@ -29,6 +29,4 @@ Lead with **one** recommendation: the issue (ID **and** title — IDs never trav
 
 ## Hand off
 
-Offer the switch, and flip the chosen task `ready` if it was pre-ready so the Developer gets a clean handoff:
-
-> 📋 Next up is UNYT-xxx "…". Put on the **Developer cap** to plan and build it? (`/cap-developer`)
+Flip the chosen task `ready` if it was pre-ready so the developer gets a clean handoff, and end the report with the recommendation in one line — issue ID + title + task-doc path — so the orchestrator can spawn the `developer` agent on it (or the user can just say "build it").

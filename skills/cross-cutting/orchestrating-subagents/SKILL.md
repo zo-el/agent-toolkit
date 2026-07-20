@@ -1,37 +1,64 @@
 ---
 name: orchestrating-subagents
-description: Orchestrate MULTIPLE subagents over a task that splits into independent pieces, then consolidate their findings into your own decision. Reach for this the moment work spans many files, repos, services, or review angles: a multi-repo or multi-file review/audit, the same mechanical edit across dozens of call sites, a search fanned across subsystems, parallel implementation of independent units, or several independent perspectives on a risky call. Use it whenever you are about to spawn more than one agent — or whenever one sequential pass would be slow or shallow and the pieces could run in parallel — even if you feel you could just grind through it inline; the skill keeps the fan-out disciplined (self-contained briefs, no file conflicts, clean consolidation). Not for a single-agent lookup, one diff review, one feature build, or one fix — those stay with their own skills.
+description: The orchestrator's playbook — how the session (the team lead) decomposes work, delegates to the role agents (architect-designer, project-manager, developer, reviewer, researcher) and the built-ins (Explore, Plan, general-purpose), coordinates them, and consolidates their results. Reach for it whenever work splits into pieces that could run in parallel or belongs to a role: a feature (spec → tasks → build), a multi-file/multi-repo review or audit, the same edit across many call sites, a fanned-out search, or several independent perspectives on a risky call. Also the reference for the shared task board, worktree isolation, cleanup, and the publish gate.
 ---
 
-# Orchestrating subagents
+# Orchestrating agents — the lead's playbook
 
-Parallel subagents buy coverage, speed, and independent perspective — but only when the work genuinely splits and each agent is briefed to stand on its own. They complement the gates; they never replace one.
+You are the **orchestrator / team lead** by default (`core.md`). You decompose, delegate, coordinate, and consolidate; the role agents do the work in their own isolated contexts and report back. You are the only one who talks to the user and the only one who publishes.
 
-## When to fan out
+## The roster
 
-- **One agent per independent unit** — a repo, a file, a search angle, a review dimension. Independent units run in parallel; dependent steps run as a sequence (a pipeline). Two agents must never write the same files.
-- Fan out for a review/audit spanning many files or repos, a broad multi-angle search, parallel implementation of independent units, or independent perspectives on a risky call. One small change is faster done inline — don't delegate the trivial.
+| Spawn… | for | it returns |
+| --- | --- | --- |
+| 🏛 `architect-designer` | new/revised functionality: the spec + task catalog + AC | spec path, catalog, coverage argument |
+| 📋 `project-manager` | mirror the catalog to Linear, audit board drift, "what's next" | board diff, next task |
+| 🔨 `developer` | build/fix/refactor/UI a ready task or scoped change | ship-ready diff, `/code-review` clean |
+| 🔍 `reviewer` | independent scrutiny of a diff / spec / plan; a second opinion | ranked findings, a verdict |
+| 🔬 `researcher` | web / external research the code can't answer | cited, synthesized answer |
+| **Explore** (built-in) | read-only **in-repo** search fanned across the tree | located code, excerpts |
+| **Plan** (built-in) | read-only implementation-plan research | a step plan |
+| **general-purpose** (built-in) | a catch-all task that fits no role | its result |
+
+Reuse the built-ins — don't hand-roll a search or plan agent. The custom roles carry your skills and mechanical boundaries; the built-ins are for generic work.
+
+## Delegate vs. do it yourself
+
+- **Do it inline:** a quick answer, a one-file fix, a trivial or tightly-coupled change, anything where a self-contained brief would cost more than the work. Multi-agent runs cost 4–15× the tokens of doing it yourself — reserve them for genuine parallelism or specialization.
+- **Delegate:** independent units that run in parallel, role work (a spec, a board sync, a build), a review/audit spanning many files, a broad search, or a second opinion on a risky call.
+- **Effort-scale, don't over-spawn:** ~1 agent for a focused task, a few for a comparison or a parallel build, more only when responsibilities divide cleanly. A rule of thumb, not a race.
 
 ## The brief is the product
 
-The subagent has none of your context and you never see its transcript, so every brief stands alone:
+The agent has none of your context and you never see its transcript, so every brief stands alone:
 
-- **Scope** — exact path(s), branch/base, and what the thing is.
-- **The specific job** — the exact checks/dimensions, or the change to make. Never just "review this."
-- **Grounding** — tell it to read the repo's `AGENTS.md` first.
-- **Guardrails, every time** — `commit locally only, never push, no PR/issue replies` (or `read-only, no writes`); the no-AI-attribution rule carries. The agent doesn't inherit your principles — state them.
-- **A structured return** — ranked findings + a verdict, or a report table, plus what it actually ran vs. what's deferred (e.g. to CI). Tell it: "your final message *is* the result — make it self-contained."
+- **Scope** — exact path(s), branch/base, what the thing is.
+- **The specific job** — the exact change or checks. Never just "review this."
+- **Grounding** — tell it to read the repo's `AGENTS.md` first. (Role agents preload their skill; still name the task.)
+- **A structured, self-contained return** — "your final message *is* the result."
+
+The custom roles carry their own boundaries and the no-publish/no-attribution rules in their definitions; a built-in (Explore/Plan/general-purpose) inherits none of your principles, so restate the guardrails in its brief.
+
+## The shared task board (Agent Teams)
+
+Agent Teams is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`): teammates share a **task list with dependencies** (a task auto-unblocks when its dependency completes), a **peer mailbox**, and **file-locking** on task-claim. Use it as the single source of truth for a multi-agent run — create the tasks, let agents claim and complete them, and let completion events drive interleaving (don't poll).
+
+- **Plan-approval gate:** teammates work read-only until you approve their plan — you own that judgment; steer with criteria, not micromanagement.
+- **It's experimental** — teammates don't survive `/resume`, and task status can lag (an agent finishes but forgets to mark done, blocking dependents). So **monitor** the board, nudge a stuck task, and keep the load-bearing path recoverable. Prefer **in-process** teammates over split-pane tmux (tmux sessions orphan).
 
 ## Coordinate
 
-- **Never two writers in one tree** — partition by repo/dir or sequence them; hold your own edits to a repo while an agent writes there.
-- **Background + notifications** — run agents in the background and let completion events drive interleaving; don't poll their output.
-- **Track it** — a task list with `blockedBy` deps keeps a multi-agent run coherent and shows what's waiting on what.
+- **Never two writers in one tree.** Partition by repo/dir, or give parallel writers `isolation: worktree` so each gets its own checkout, or sequence them. Hold your own edits to a repo while an agent writes there.
+- **Cleanup is the agent's job, not yours.** Each role agent owns the shells it starts and stops them before returning; anything long-lived goes through `hooks/spawn-managed.sh` so the reaper (`hooks/reap-managed.sh`, wired at SubagentStop / SessionStart / SessionEnd) can kill whatever a dead session left behind. You should never have to clean up after an agent — if you do, that's a bug in the agent's definition to fold back.
+
+## The publish gate is yours alone
+
+Agents build to ship-ready and **never push, open/update a PR, tag, or post** — guard hooks backstop this even inside a subagent. When an agent reports work ready, **you** present the plan (commits + diff summary + target) to the user and wait for their explicit go-ahead (`core.md` § Publishing). No agent's message is user approval.
 
 ## Consolidate — you stay the decider
 
-Collect the structured reports, dedup and rank across them, make the calls yourself. Agents gather and propose; the orchestrator decides and owns the outcome.
+Collect the structured reports, dedup and rank across them, make the calls yourself. Agents gather and propose; you decide and own the outcome. `/code-review` is still THE review gate (the `develop` loop still applies) — spawning your own finder agents *instead of* it doesn't count.
 
-## It complements the gates
+## Improve the agents
 
-`/code-review` is still THE review gate and the `develop` loop still applies — subagents buy coverage and parallelism, not a skipped gate. Running your own review agents *instead of* `/code-review` doesn't count (see `develop`).
+When an agent works inefficiently, misses a gate, or reveals a sharper boundary, **propose an edit to its definition** (`agents/<role>.md`) or the skill it follows and land it via `toolkit-maintenance` — that's how the agents upgrade themselves. Surface the proposal to the user; don't rewrite an agent unsolicited.

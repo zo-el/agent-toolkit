@@ -5,7 +5,7 @@ description: How to write a Claude Code skill (SKILL.md) so it auto-triggers rel
 
 # Skill authoring
 
-How skills are written in this toolkit. The spec/mechanics are Anthropic's, the tool is `skill-creator`, and this holds the house conventions and points at both. Markdown formatting follows the `documentation-style` skill. Two placement decisions come first: **core-vs-skill** (toolkit-root `CLAUDE.md`) and, for a skill, **which cap owns it** (below).
+How skills are written in this toolkit. The spec/mechanics are Anthropic's, the tool is `skill-creator`, and this holds the house conventions and points at both. Markdown formatting follows the `documentation-style` skill. Two placement decisions come first: **core-vs-skill** (toolkit-root `CLAUDE.md`) and, for a skill, **which role owns it** (below).
 
 ## The description is the auto-trigger — get it right
 
@@ -22,15 +22,15 @@ A skill's `name` + `description` are the only parts always in context; Claude ma
 - **Progressive disclosure** — push long reference into sibling files the skill links to (one level deep); they load only when referenced, so the always-on trigger metadata stays cheap.
 - **One home** — never restate what `core.md` or another skill owns; lean on its auto-fire instead (a skill needing general doc/code style relies on `documentation-style`).
 
-## Placement — which cap owns it
+## Placement — which role owns it
 
-Skills live in a tree **by owning cap**; the path is the only home for ownership, so names stay semantic (never prefix with a cap). Decide before writing:
+Skills live in a tree **by owning agent role**; the path is the only home for ownership, so names stay semantic (never prefix with a role). Decide before writing:
 
-- **A new cap** (a working posture / soul file) → `skills/caps/cap-<role>/`, following the soul-file shape — *Who you are · What you use · Boundaries · Hand-off · Grow & learn* (see `caps`). Rare.
-- **Owned by exactly one cap** (only that cap would ever use it) → `skills/owned/<cap>/`. The owning cap's soul file points to it under *What you use → Yours*.
-- **Cross-cutting** (more than one cap uses it) → `skills/cross-cutting/`, listed once in `caps`.
+- **A new agent** (a role with its own identity, tools, and boundaries) → `agents/<role>.md`, not a skill — frontmatter tool allowlist + a body of *identity · how you work · boundaries · process hygiene · what you return* (roster + when-to-spawn: `orchestrating-subagents`; lifecycle: `toolkit-maintenance`). Rare.
+- **Owned by exactly one role** (only that agent would ever use it) → `skills/owned/<role>/`. The owning agent's definition preloads or points to it.
+- **Cross-cutting** (more than one role uses it) → `skills/cross-cutting/`, listed once in `orchestrating-subagents` where relevant.
 
-Name the cap(s) it *could* apply to: exactly one → owned; more than one → cross-cutting (don't force it under a single cap). When unsure, default to cross-cutting and let a cap claim it later — re-owning is just a `mv`. If the skill is a cap's *exclusive* tool boundary (e.g. only the PM touches Linear), declare it in the cap's soul file and hard-enforce with a `PreToolUse` hook — a skill alone can't lock a tool.
+Name the role(s) it *could* apply to: exactly one → owned; more than one → cross-cutting (don't force it under a single role). When unsure, default to cross-cutting and let a role claim it later — re-owning is just a `mv`. An agent's *exclusive* tool boundary is its frontmatter `tools:` allowlist (e.g. only the project-manager carries `mcp__linear`) — mechanical, no hook needed; a skill alone can't lock a tool.
 
 ## Test it with skill-creator
 
@@ -42,4 +42,4 @@ Name the cap(s) it *could* apply to: exactly one → owned; more than one → cr
 
 ## Lifecycle
 
-The `skills/` tree **is** the catalog — self-describing via frontmatter, no hand-maintained index. Install is discovery-driven: `install-skills.sh` symlinks every directory containing a `SKILL.md` at **any depth** (grouping folders like `caps/` `owned/` `cross-cutting/` carry none) and prunes broken links, so adding a skill in any group folder needs no edit elsewhere. Basenames stay unique across the tree. The full change lifecycle — verify, land, propagate to other machines — is the `toolkit-maintenance` skill; this one owns the craft of the skill file itself.
+The `skills/` tree **is** the catalog — self-describing via frontmatter, no hand-maintained index. Install is discovery-driven: `install-skills.sh` symlinks every directory containing a `SKILL.md` at **any depth** (grouping folders like `owned/` `cross-cutting/` carry none) and prunes broken links, so adding a skill in any group folder needs no edit elsewhere. Basenames stay unique across the tree. The full change lifecycle — verify, land, propagate to other machines — is the `toolkit-maintenance` skill; this one owns the craft of the skill file itself.

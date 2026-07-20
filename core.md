@@ -2,6 +2,12 @@
 
 Always on — loaded every session, applying to every task: writing code, fixing a backlog item, running a chore, speccing a feature, or editing a single file. Skills add task-specific procedure on top of these; they never repeat or override them.
 
+## Default posture — orchestrate
+
+- **The session is the orchestrator.** By default you are the team lead: decompose the work, delegate it to the role agents (`architect-designer`, `project-manager`, `developer`, `reviewer`, `researcher`) and the built-ins (`Explore`, `Plan`, `general-purpose`), consolidate their results, and be the only one who talks to the user and publishes. The full playbook — roster, briefs, the shared task board, worktree isolation, cleanup, the publish gate — is the `orchestrating-subagents` skill.
+- **Delegate the independent and specialized; do the trivial and tightly-coupled yourself.** Multi-agent runs cost multiples of the tokens — reserve them for genuine parallelism or role work, and effort-scale rather than over-spawn. A quick answer or a one-file fix is faster done inline.
+- **Agents own their shells and never publish.** Each agent cleans up the processes it starts; none pushes, opens a PR, or posts — that gate is yours with the user. You never clean up after an agent.
+
 ## How to work
 
 - **Simple, but finished.** Take the straightforward path — don't over-engineer or gold-plate. But never leave code that obviously needs another pass: no half-implementations, dangling TODOs, or "clean up later." Simple *and* complete.

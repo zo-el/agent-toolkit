@@ -50,29 +50,59 @@ else
   "$ROOT/install-skills.sh" >/dev/null 2>&1 || warn "install-skills.sh failed"
 fi
 
+# ── 2.5 agents — COPIED, not symlinked (the agents file-watcher does not
+# reliably follow symlinks); a manifest tracks toolkit-managed names so a
+# renamed/removed agent is pruned without touching the user's own agents. ────
+AGENTS_DST="$CLAUDE_DIR/agents"
+MANIFEST="$AGENTS_DST/.toolkit-agents"
+if [ "$MODE" = "--dry-run" ]; then
+  echo "agents: $(ls "$ROOT"/agents/*.md 2>/dev/null | wc -l | tr -d ' ') copied into $AGENTS_DST"
+else
+  mkdir -p "$AGENTS_DST"
+  if [ -f "$MANIFEST" ]; then
+    while IFS= read -r name; do
+      [ -n "$name" ] && [ ! -f "$ROOT/agents/$name" ] && rm -f "$AGENTS_DST/$name"
+    done < "$MANIFEST"
+  fi
+  : > "$MANIFEST.tmp"
+  for a in "$ROOT"/agents/*.md; do
+    [ -e "$a" ] || continue
+    cmp -s "$a" "$AGENTS_DST/$(basename "$a")" 2>/dev/null || cp -f "$a" "$AGENTS_DST/$(basename "$a")"
+    basename "$a" >> "$MANIFEST.tmp"
+  done
+  mv "$MANIFEST.tmp" "$MANIFEST"
+  # Reap any managed processes whose owning session is gone (cheap, idempotent).
+  "$ROOT/hooks/reap-managed.sh" 2>/dev/null || true
+fi
+
 # ── 3. settings.json: statusline + hooks on the stable path ─────────────────
 desired_settings() {
   jq --arg base "$STABLE" '
     def ours: test("agent-toolkit|install-skills");
     def clean(a): (a // [])
       | map(select((((.hooks // []) | map(.command // "") | join(" ")) | ours) | not));
-    .statusLine = {type: "command", command: ($base + "/hooks/statusline.py"), padding: 0}
+    .env = ((.env // {}) + {CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"})
+    | .statusLine = {type: "command", command: ($base + "/hooks/statusline.py"), padding: 0}
     | .hooks.SessionStart = clean(.hooks.SessionStart) + [{
         matcher: "startup|resume|clear",
         hooks: [{type: "command", command: ($base + "/install.sh --sync")}]}]
-    | .hooks.UserPromptSubmit = clean(.hooks.UserPromptSubmit) + [{
-        hooks: [{type: "command", command: ($base + "/hooks/cap-set.sh")}]}]
+    | .hooks.UserPromptSubmit = clean(.hooks.UserPromptSubmit)
     | .hooks.PreToolUse = clean(.hooks.PreToolUse) + [
-        {matcher: "mcp__linear-server__.*",
-         hooks: [{type: "command", command: ($base + "/hooks/cap-guard-linear.sh")}]},
         {matcher: "Bash",
          hooks: [{type: "command", command: ($base + "/hooks/guard-git.sh")}]},
         {matcher: "Write|Edit|NotebookEdit",
-         hooks: [{type: "command", command: ($base + "/hooks/guard-config.sh")}]}]
+         hooks: [{type: "command", command: ($base + "/hooks/guard-config.sh")}]},
+        {matcher: "mcp__linear.*",
+         hooks: [{type: "command", command: ($base + "/hooks/guard-linear.sh")}]}]
     | .hooks.PostToolUse = clean(.hooks.PostToolUse) + [{
         matcher: "Write|Edit",
         hooks: [{type: "command", command: ($base + "/hooks/sync-on-skill-edit.sh")},
                 {type: "command", command: ($base + "/hooks/format-on-edit.sh"), async: true}]}]
+    | .hooks.SubagentStop = clean(.hooks.SubagentStop) + [{
+        hooks: [{type: "command", command: ($base + "/hooks/reap-managed.sh")}]}]
+    | .hooks.SessionEnd = clean(.hooks.SessionEnd) + [{
+        hooks: [{type: "command", command: ($base + "/hooks/reap-managed.sh")}]}]
+    | .hooks |= with_entries(select((.value | length) > 0))
   ' "$1"
 }
 
@@ -157,6 +187,9 @@ fi
 linked="$(find "$CLAUDE_DIR/skills" -maxdepth 1 -type l 2>/dev/null | wc -l | tr -d ' ')"
 have="$(find "$ROOT/skills" -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')"
 [ "$MODE" = "--dry-run" ] || [ "$linked" -ge "$have" ] || warn "only $linked of $have skills are linked — run: $STABLE/install-skills.sh"
+agents_have="$(ls "$ROOT"/agents/*.md 2>/dev/null | wc -l | tr -d ' ')"
+agents_copied="$(ls "$CLAUDE_DIR"/agents/*.md 2>/dev/null | wc -l | tr -d ' ')"
+[ "$MODE" = "--dry-run" ] || [ "$agents_copied" -ge "$agents_have" ] || warn "only $agents_copied of $agents_have agents are installed — run: $STABLE/install.sh"
 
 if [ "$problems" -eq 0 ]; then
   say "✓ doctor: all checks green ($have skills, hooks wired via $STABLE)"

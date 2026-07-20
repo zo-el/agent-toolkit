@@ -128,25 +128,82 @@ sl '' 'empty stdin'
 sl '{"model":{"id":"claude-fable-5[1m]","display_name":"Fable 5"},"effort":{"level":"max"},"context_window":{"used_percentage":42,"context_window_size":1000000,"total_input_tokens":420000},"cost":{"total_cost_usd":1.5},"rate_limits":{"five_hour":{"used_percentage":23.5},"seven_day":{"used_percentage":81.2}},"workspace":{"current_dir":"/tmp"}}' 'full native payload'
 sl '{"transcript_path":"/nonexistent.jsonl","workspace":{"current_dir":"/nonexistent-dir"}}' 'bogus paths'
 
-# ── cap-set: only the three real caps + a typed "cap off" flip state ──
-fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
-cap_case() { # $1 sid, $2 seed state ("" = none), $3 payload json, $4 expected, $5 label
-  local got
-  [ -n "$2" ] && printf '%s\n' "$2" > "$fh/.claude/.active-cap-$1"
-  printf '%s' "$3" | HOME="$fh" "$root/hooks/cap-set.sh" >/dev/null 2>&1
-  got="$(cat "$fh/.claude/.active-cap-$1" 2>/dev/null || echo "<none>")"
-  if [ "$got" = "$4" ]; then pass=$((pass + 1)); else
-    fail=$((fail + 1))
-    printf 'FAIL cap-set.sh     want=%-13s got=%-13s %s\n' "$4" "$got" "$5"
-  fi
+# ── guard-linear: reads free, writes ask ──
+linear_case() { # $1 expected, $2 tool name
+  check guard-linear.sh "$1" "$(jq -cn --arg t "$2" '{tool_name:$t,tool_input:{}}')" "$2"
 }
-cap_case t1 "" '{"session_id":"t1","prompt":"/cap-developer please"}' cap-developer "/cap-developer sets state"
-cap_case t2 cap-developer '{"session_id":"t2","prompt":"/cap-reviewer please"}' cap-developer "removed /cap-reviewer must not flip state"
-cap_case t3 cap-developer '{"session_id":"t3","prompt":"cap off"}' off "'cap off' alone flips to off"
-cap_case t4 cap-developer '{"session_id":"t4","prompt":"the doc says \"cap off\" drops to bare mode - thoughts?"}' cap-developer "mid-text 'cap off' (pasted doc) must not flip"
-cap_case t5 cap-project-manager '{"session_id":"t5","prompt":"board updated, thanks - cap off"}' off "'cap off' at prompt end flips to off"
-cap_case t6 cap-developer '{"session_id":"t6","prompt":"\ncap off"}' off "shift-enter (JSON-escaped newline) before 'cap off' still flips"
-rm -rf "$fh"
+linear_case allow mcp__linear__list_issues
+linear_case allow mcp__linear__get_issue
+linear_case allow mcp__linear__search_documentation
+linear_case ask   mcp__linear__save_issue
+linear_case ask   mcp__linear__save_milestone
+linear_case ask   mcp__linear__create_issue_label
+linear_case ask   mcp__linear__delete_comment
+linear_case ask   mcp__linear__some_future_verb
+check guard-linear.sh allow '{"tool_name":"Bash","tool_input":{"command":"ls"}}' 'non-linear tool untouched'
+
+# ── spawn-managed + reap-managed: dead-owner procs reaped, live/unknown spared ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
+p_dead_owner="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=gone-session "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+p_live_owner="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=live-session "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+p_unknown="$(HOME="$fh" CLAUDE_CODE_SESSION_ID= "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+printf '{"pid":99999999,"session":"s","cmd":"x","started":"t"}' > "$fh/.claude/managed-procs/99999999.json"
+printf '{"pid":%d,"sessionId":"live-session"}' "$$" > "$fh/.claude/sessions/$$.json"
+HOME="$fh" "$root/hooks/reap-managed.sh"; HOME="$fh" "$root/hooks/reap-managed.sh"
+for i in 1 2 3 4 5; do kill -0 "$p_dead_owner" 2>/dev/null || break; sleep 0.2; done
+if ! kill -0 "$p_dead_owner" 2>/dev/null && [ ! -e "$fh/.claude/managed-procs/$p_dead_owner.json" ]; then
+  pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL reap-managed   dead-owner process not reaped"
+fi
+if kill -0 "$p_live_owner" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   live-owner process was killed"
+fi
+if kill -0 "$p_unknown" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   unknown-owner process was killed (must be fail-safe)"
+fi
+if [ ! -e "$fh/.claude/managed-procs/99999999.json" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   dead-pid entry not pruned"
+fi
+kill "$p_live_owner" "$p_unknown" 2>/dev/null; rm -rf "$fh"
+
+# ── reap-managed fail-safe: no sessions registry → never kill (liveness unknowable) ──
+fh="$(mktemp -d)"
+p_nosessions="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=gone-session "$root/hooks/spawn-managed.sh" -- sleep 300 | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+HOME="$fh" "$root/hooks/reap-managed.sh"; HOME="$fh" "$root/hooks/reap-managed.sh"
+if kill -0 "$p_nosessions" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   killed a process with NO sessions registry (must fail safe)"
+fi
+kill "$p_nosessions" 2>/dev/null; rm -rf "$fh"
+
+# ── reap-managed: recycled pid (start time mismatch) is pruned, never signalled ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs" "$fh/.claude/sessions"
+p_innocent="$(setsid sleep 300 >/dev/null 2>&1 & echo $!)"
+printf '{"pid":%d,"session":"gone-session","starttime":"1"}' "$p_innocent" > "$fh/.claude/managed-procs/$p_innocent.json"
+printf '{"pid":%d,"sessionId":"live-session"}' "$$" > "$fh/.claude/sessions/$$.json"
+HOME="$fh" "$root/hooks/reap-managed.sh"; HOME="$fh" "$root/hooks/reap-managed.sh"
+if kill -0 "$p_innocent" 2>/dev/null && [ ! -e "$fh/.claude/managed-procs/$p_innocent.json" ]; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   recycled-pid entry must be pruned WITHOUT signalling the process"
+fi
+kill "$p_innocent" 2>/dev/null; rm -rf "$fh"
+
+# ── reap-managed: TERM is not escalated to KILL inside the grace window ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/sessions"
+p_grace="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=gone-session "$root/hooks/spawn-managed.sh" -- sh -c 'trap "" TERM; sleep 300' | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+printf '{"pid":%d,"sessionId":"live-session"}' "$$" > "$fh/.claude/sessions/$$.json"
+HOME="$fh" "$root/hooks/reap-managed.sh"; sleep 0.3; HOME="$fh" "$root/hooks/reap-managed.sh"
+if kill -0 "$p_grace" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   SIGKILLed inside the grace window (no time to shut down)"
+fi
+kill -KILL -- "-$p_grace" 2>/dev/null; rm -rf "$fh"
+
+# ── spawn-managed: a command with quotes/backslashes/newlines stays valid JSON ──
+fh="$(mktemp -d)"
+p_json="$(HOME="$fh" CLAUDE_CODE_SESSION_ID=s "$root/hooks/spawn-managed.sh" -- sh -c 'sleep 300 # a "quoted" \back\slash
+newline' | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+')"
+if jq -e '.pid' "$fh/.claude/managed-procs/$p_json.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL spawn-managed  registry entry is not valid JSON for a tricky command"
+fi
+kill -KILL -- "-$p_json" 2>/dev/null; kill "$p_json" 2>/dev/null; rm -rf "$fh"
 
 # ── install.sh invoked via its own stable symlink must not self-loop ──
 fh="$(mktemp -d)"
