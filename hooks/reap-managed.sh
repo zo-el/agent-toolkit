@@ -79,16 +79,35 @@ for e in "$reg"/*.json; do
   [ "$reap" -eq 1 ] || continue
 
   # TERM once, KILL only after the grace window has passed.
+  #
+  # The marker is named for a pid, so it must also carry the identity it was
+  # written for. A marker left behind by an earlier holder of this pid reads as
+  # "already TERMed, long ago" and would send this process straight to KILL with
+  # no chance to shut down. Anything that doesn't match this exact process —
+  # different start time, unreadable, or the older epoch-only format — counts as
+  # not yet TERMed. The error is always toward giving grace, never skipping it.
+  termed=0 m_at="" m_st=""
   if [ -f "$reg/$pid.term" ]; then
-    termed="$(cat "$reg/$pid.term" 2>/dev/null || echo 0)"
-    case "$termed" in ''|*[!0-9]*) termed=0 ;; esac
+    read -r m_at m_st < "$reg/$pid.term" 2>/dev/null || true
+    case "$m_at" in ''|*[!0-9]*) m_at=0 ;; esac
+    [ "$m_st" = "$st" ] && termed="$m_at"
+  fi
+
+  if [ "$termed" -gt 0 ]; then
     if [ "$((now - termed))" -ge "$GRACE" ]; then
       kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
       rm -f "$e" "$reg/$pid.term"
     fi
   else
     kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
-    printf '%s\n' "$now" > "$reg/$pid.term"
+    printf '%s %s\n' "$now" "$st" > "$reg/$pid.term"
   fi
+done
+
+# Markers whose entry is gone can only mislead a future holder of that pid.
+for m in "$reg"/*.term; do
+  [ -e "$m" ] || continue
+  b="${m##*/}"; b="${b%.term}"
+  [ -e "$reg/$b.json" ] || rm -f "$m"
 done
 exit 0

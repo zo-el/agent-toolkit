@@ -212,6 +212,33 @@ if kill -0 "$p_grace" 2>/dev/null; then pass=$((pass + 1)); else
 fi
 kill -KILL -- "-$p_grace" 2>/dev/null; rm -rf "$fh"
 
+# ── a stale .term marker must not skip TERM and SIGKILL a fresh process ──
+# Markers are named for a pid, so one left by an earlier holder of that pid used
+# to read as "TERMed long ago" → straight to KILL, no grace. The process here
+# ignores TERM, so surviving a pass proves it was TERMed and not KILLed.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
+p_stale="$(setsid sh -c 'trap "" TERM; sleep 300' >/dev/null 2>&1 & echo $!)"
+dead_owner3="$(sh -c 'echo $$')"
+jq -n --argjson pid "$p_stale" --arg st "$(sed 's/.*) //' /proc/$p_stale/stat | awk '{print $20}')" \
+  --arg op "$dead_owner3" --arg os "" \
+  '{pid:$pid, starttime:$st, owner_pid:$op, owner_start:$os}' \
+  > "$fh/.claude/managed-procs/$p_stale.json"
+echo "$(( $(date +%s) - 9999 ))" > "$fh/.claude/managed-procs/$p_stale.term"
+HOME="$fh" "$root/hooks/reap-managed.sh" </dev/null; sleep 0.3
+if kill -0 "$p_stale" 2>/dev/null; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   stale .term marker skipped TERM and SIGKILLed outright"
+fi
+kill -KILL -- "-$p_stale" 2>/dev/null
+
+# ── a marker with no surviving entry is swept, so no future pid inherits it ──
+echo "123 456" > "$fh/.claude/managed-procs/424242.term"
+rm -f "$fh/.claude/managed-procs"/*.json
+HOME="$fh" "$root/hooks/reap-managed.sh" </dev/null
+if [ ! -e "$fh/.claude/managed-procs/424242.term" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL reap-managed   orphan .term marker not swept"
+fi
+rm -rf "$fh"
+
 # ── the kill-vs-spare branch: uncertainty spares, only a positive mismatch reaps ──
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude/managed-procs"
 # (a) live owner, start time NOT recorded → unverifiable → must be SPARED
