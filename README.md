@@ -18,6 +18,8 @@ The session itself is the **orchestrator** (`core.md`): it decomposes work, spaw
 
 Honest about the layering: the allowlist is the hard boundary (the reviewer genuinely *cannot* call Edit; only the PM *has* Linear tools), while "never writes source", "never pushes" are role discipline in each definition — backed by the guard hooks, which fire inside subagents too. Agents that need `Bash` to do their job (build, test, reproduce a finding) could in principle write through it; the gates above are what make that a violation rather than an accident.
 
+**The roles orchestrate too, one level down.** Work that splits into independent parts defaults to one agent per part, and every role but the PM carries `Agent` so it can fan out *within its own role* — sub-developers on independent parts of a fix, one reviewer per lens, parallel research angles — converging the results itself. The cap is **two levels**: the session spawns agents, those agents may spawn agents, and there it stops (`/code-review`, which fans out internally, is exempt). The PM is deliberately without `Agent` — parallel board writes are how a board drifts.
+
 The built-ins (`Explore`, `Plan`, `general-purpose`) cover generic search/planning — the custom roles exist for the skills and boundaries above, and every agent cleans up its own processes ([`hooks/spawn-managed.sh`](hooks/spawn-managed.sh) + [`hooks/reap-managed.sh`](hooks/reap-managed.sh) guarantee it). The full playbook — when to delegate, briefs, the Agent Teams task board, worktree isolation — is the `orchestrating-subagents` skill.
 
 ## Core vs. skills

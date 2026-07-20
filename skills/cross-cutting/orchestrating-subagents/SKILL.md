@@ -27,6 +27,17 @@ Reuse the built-ins — don't hand-roll a search or plan agent. The custom roles
 - **Do it inline:** a quick answer, a one-file fix, a trivial or tightly-coupled change, anything where a self-contained brief would cost more than the work. Multi-agent runs cost 4–15× the tokens of doing it yourself — reserve them for genuine parallelism or specialization.
 - **Delegate:** independent units that run in parallel, role work (a spec, a board sync, a build), a review/audit spanning many files, a broad search, or a second opinion on a risky call.
 - **Effort-scale, don't over-spawn:** ~1 agent for a focused task, a few for a comparison or a parallel build, more only when responsibilities divide cleanly. A rule of thumb, not a race.
+- **One agent per independent part.** A multi-part fix defaults to one agent per part that can move on its own; you converge their results. Serialize only what genuinely can't overlap: **writes to the same tree** (partition, `isolation: worktree`, or sequence) and the **build → test → review loop** — that's one gate over one tree, run once on the converged result, not a race.
+
+## Agents orchestrate too — two levels, one exception
+
+Every role agent but the PM carries `Agent`, so it can fan out **within its own role**: a developer splitting an independent-part fix across sub-developers, a reviewer running one agent per lens (correctness / security / perf / does-it-reproduce), a researcher sweeping sources in parallel, an architect drafting competing designs to compare. The same rules apply one level down — the brief stands alone, one writer per tree, converge before returning.
+
+**The depth cap is two levels.** You spawn agents; *they* may spawn agents; **those are the last level** and do not spawn further. Whoever spawns states that in the brief — it's brief discipline, not a mechanical wall (the sub-agent has the same `tools:` as any agent of its type), so say it explicitly every time.
+
+**`/code-review` is exempt.** It fans out its own agents internally, and that never counts against the cap — a level-2 developer still runs the full review loop. Reviewing is a gate, not a delegation.
+
+The PM deliberately has **no** `Agent`: board writes are single-writer by design, and parallel Linear mutation is exactly how a board drifts.
 
 ## The brief is the product
 
