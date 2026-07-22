@@ -13,7 +13,7 @@ You are the **orchestrator / team lead** by default (`core.md`). You decompose, 
 | --- | --- | --- |
 | 🏛 `architect-designer` | new/revised functionality: the spec + task catalog + AC | spec path, catalog, coverage argument |
 | 📋 `project-manager` | mirror the catalog to Linear, audit board drift, "what's next" | board diff, next task |
-| 🔨 `developer` | build/fix/refactor/UI a ready task or scoped change | ship-ready diff, `/code-review` clean |
+| 🔨 `developer` | build/fix/refactor/UI a ready task or scoped change | ship-ready diff, `pr-review-toolkit` review clean |
 | 🔍 `reviewer` | independent scrutiny of a diff / spec / plan; a second opinion | ranked findings, a verdict |
 | 🔬 `researcher` | web / external research the code can't answer | cited, synthesized answer |
 | 🧭 `lead` | a big, clear, multi-role goal to own end-to-end (it runs the workers itself) | the delivered goal, ship-ready, each piece verified |
@@ -34,17 +34,17 @@ Reuse the built-ins — don't hand-roll a search or plan agent. The custom roles
 
 ## Agents orchestrate too — two levels, one exception
 
-Every role agent but the PM carries `Agent`, so it can fan out **within its own role**: a developer splitting an independent-part fix across sub-developers, a reviewer running one agent per lens (correctness / security / perf / does-it-reproduce), a researcher sweeping sources in parallel, an architect drafting competing designs to compare. The same rules apply one level down — the brief stands alone, one writer per tree, converge before returning. A role may also reach **across** to a different role when its own loop calls for it — most often a `developer` spawning a `reviewer` for a lighter external second opinion after its own `/code-review` (see `develop`); that still counts against the two-level cap.
+Every role agent but the PM carries `Agent`, so it can fan out **within its own role**: a developer splitting an independent-part fix across sub-developers, a reviewer running one agent per lens (correctness / security / perf / does-it-reproduce), a researcher sweeping sources in parallel, an architect drafting competing designs to compare. The same rules apply one level down — the brief stands alone, one writer per tree, converge before returning. A role may also reach **across** to a different role when its own loop calls for it — most often a `developer` spawning a `reviewer` for a lighter external second opinion after its own `pr-review-toolkit` self-review (see `develop`); that still counts against the two-level cap.
 
 **The depth cap is two levels.** You spawn agents; *they* may spawn agents; **those are the last level** and do not spawn further. Whoever spawns states that in the brief — it's brief discipline, not a mechanical wall (the sub-agent has the same `tools:` as any agent of its type), so say it explicitly every time.
 
-**`/code-review` is exempt.** It fans out its own agents internally, and that never counts against the cap — a level-2 developer still runs the full review loop. Reviewing is a gate, not a delegation.
+**The review gate is exempt.** A developer's self-review — and a reviewer's scrutiny pass — spawns the `pr-review-toolkit` agents (`code-reviewer` et al.) on the diff; spawning one as a review gate never counts against the cap, so a level-2 sub-developer still runs the full review loop. Reviewing is a gate, not a delegation. (The bundled `/code-review` slash command is the user's own pre-push gate — user-invocable only, so no agent runs it.)
 
 The PM deliberately has **no** `Agent`: board writes are single-writer by design, and parallel Linear mutation is exactly how a board drifts.
 
 ## The `lead` — hand off a whole goal
 
-When a goal is **big, clear, and multi-role** — a whole feature, a cross-cutting refactor, a spec-through-build stream — you can hand the *entire* goal to one **`lead`** agent instead of sequencing every micro-step yourself. A `lead` is a semi-orchestrator: it decomposes the goal, delegates each piece to the right worker (developer, architect-designer, reviewer, …), **verifies each returned goal was *achieved*** — it doesn't re-review the craft (a build's quality is the developer's own `/code-review` loop) — and iterates to production quality before reporting done. Two payoffs: it **collapses the back-and-forth** (you hold one goal, not twenty steps), and it lets you **run several big streams at once** (one `lead` each). It's a **level-1 orchestrator you spawn** — its workers are the leaves, and it never nests under another `lead`. Cost: it adds an orchestration layer, so reserve it for genuinely big goals — a small, clear goal still goes straight to a single `developer`. (Don't confuse a `lead`, the agent, with *you*, the team lead who spawns it.)
+When a goal is **big, clear, and multi-role** — a whole feature, a cross-cutting refactor, a spec-through-build stream — you can hand the *entire* goal to one **`lead`** agent instead of sequencing every micro-step yourself. A `lead` is a semi-orchestrator: it decomposes the goal, delegates each piece to the right worker (developer, architect-designer, reviewer, …), **verifies each returned goal was *achieved*** — it doesn't re-review the craft (a build's quality is the developer's own `pr-review-toolkit` review loop) — and iterates to production quality before reporting done. Two payoffs: it **collapses the back-and-forth** (you hold one goal, not twenty steps), and it lets you **run several big streams at once** (one `lead` each). It's a **level-1 orchestrator you spawn** — its workers are the leaves, and it never nests under another `lead`. Cost: it adds an orchestration layer, so reserve it for genuinely big goals — a small, clear goal still goes straight to a single `developer`. (Don't confuse a `lead`, the agent, with *you*, the team lead who spawns it.)
 
 ## The brief is the product
 
@@ -84,7 +84,7 @@ Agents build to ship-ready and **never push, open/update a PR, tag, or post** �
 
 ## Consolidate — you stay the decider
 
-Collect the structured reports, dedup and rank across them, make the calls yourself. Agents gather and propose; you decide and own the outcome. `/code-review` is still THE review gate (the `develop` loop still applies) — spawning your own finder agents *instead of* it doesn't count.
+Collect the structured reports, dedup and rank across them, make the calls yourself. Agents gather and propose; you decide and own the outcome. The developer's `pr-review-toolkit` self-review is still THE agent-side review gate (the `develop` loop still applies) — your own finder agents inform your decision but don't stand in for it, and the user's pre-push `/code-review` is a separate human gate.
 
 ## Improve the agents
 

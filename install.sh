@@ -118,6 +118,14 @@ desired_settings() {
     # and re-introduce a prompt exactly where it matters (push, PR, comments as
     # the user, reset --hard, ~/.claude, Linear writes).
     | .permissions = ((.permissions // {}) + {defaultMode: "auto"})
+    # Enable pr-review-toolkit: the developer and reviewer self-review gate spawns
+    # its agents (code-reviewer, silent-failure-hunter, etc.) on the local git diff.
+    # The bundled /code-review is user-invocable only — a human pre-push gate, never
+    # callable by a subagent — so enabling this is what gives the agents a review
+    # gate at all. (Takes effect once the plugin is installed/cached; if it is not,
+    # the user runs: /plugin install pr-review-toolkit@claude-plugins-official)
+    # NB: no apostrophes in this jq program — it is a single-quoted shell argument.
+    | .enabledPlugins["pr-review-toolkit@claude-plugins-official"] = true
     # Superseded by hooks/notify.sh — disable the external notifications plugin
     # so a sound is not played twice (no-op if it was never installed).
     | (if (.enabledPlugins // {} | has("claude-notifications-go@claude-notifications-go"))

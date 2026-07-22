@@ -343,6 +343,22 @@ if [ "$rc" -ne 0 ] && [ -s "$fh/.claude/agent-toolkit-version" ]; then pass=$((p
 fi
 rm -rf "$fh"
 
+# ── install.sh: desired_settings actually enables the pr-review-toolkit plugin ──
+# The jq program is one single-quoted shell arg — an apostrophe inside it silently
+# breaks the program → empty output → install falls through to "already current"
+# and the enabledPlugins entry never lands. Seed a sibling plugin and prove the
+# merge ADDS the entry while keeping the sibling: one assertion catches both the
+# silent no-op and a clobbering merge.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"enabledPlugins":{"other-plugin@vendor":true}}\n' > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true
+          and .enabledPlugins["other-plugin@vendor"] == true' \
+     "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     pr-review-toolkit plugin not enabled (or merge clobbered a sibling)"
+fi
+rm -rf "$fh"
+
 # ── notify.sh: host-independent sound/player resolution, fail-safe on no audio ──
 # notify.sh emits (even under NOTIFY_DRYRUN) only when BOTH a sound and a player
 # resolve, and its fallbacks depend on which freedesktop sounds / players a host
