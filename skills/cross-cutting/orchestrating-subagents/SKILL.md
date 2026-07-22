@@ -3,7 +3,7 @@ name: orchestrating-subagents
 description: The orchestrator's playbook — how the session (the team lead) decomposes work, delegates to the role agents (architect-designer, project-manager, developer, reviewer, researcher) and the built-ins (Explore, Plan, general-purpose), coordinates them, and consolidates their results. Reach for it whenever work splits into pieces that could run in parallel or belongs to a role: a feature (spec → tasks → build), a multi-file/multi-repo review or audit, the same edit across many call sites, a fanned-out search, or several independent perspectives on a risky call. Also the reference for the shared task board, worktree isolation, cleanup, and the publish gate.
 ---
 
-# Orchestrating agents — the lead's playbook
+# Orchestrating agents — the orchestrator's playbook
 
 You are the **orchestrator / team lead** by default (`core.md`). You decompose, delegate, coordinate, and consolidate; the role agents do the work in their own isolated contexts and report back. You are the only one who talks to the user and the only one who publishes.
 
@@ -16,11 +16,12 @@ You are the **orchestrator / team lead** by default (`core.md`). You decompose, 
 | 🔨 `developer` | build/fix/refactor/UI a ready task or scoped change | ship-ready diff, `/code-review` clean |
 | 🔍 `reviewer` | independent scrutiny of a diff / spec / plan; a second opinion | ranked findings, a verdict |
 | 🔬 `researcher` | web / external research the code can't answer | cited, synthesized answer |
+| 🧭 `lead` | a big, clear, multi-role goal to own end-to-end (it runs the workers itself) | the delivered goal, ship-ready, each piece verified |
 | **Explore** (built-in) | read-only **in-repo** search fanned across the tree | located code, excerpts |
 | **Plan** (built-in) | read-only implementation-plan research | a step plan |
 | **general-purpose** (built-in) | a catch-all task that fits no role | its result |
 
-Reuse the built-ins — don't hand-roll a search or plan agent. The custom roles carry your skills and mechanical boundaries; the built-ins are for generic work.
+Reuse the built-ins — don't hand-roll a search or plan agent. The custom roles carry your skills and mechanical boundaries; the built-ins are for generic work. **The roster isn't closed:** match each goal to the closest fit, and when nothing fits a role, reach for **`general-purpose`** rather than minting a new named agent.
 
 ## Delegate everything — even serial work
 
@@ -28,18 +29,22 @@ Reuse the built-ins — don't hand-roll a search or plan agent. The custom roles
 - **Serial, un-parallelizable work is delegated too — you sequence it.** "It's one shared file," "it can't be parallelized," "it'd be quicker myself" are not exceptions. The loop is: hand an agent the goal → **verify what it returns** → hand the next goal to whichever agent you now decide is needed. A chain of one-agent-at-a-time is still delegation — you're the sequencer, not a link in it.
 - **An agent can idle until its input is ready, then act.** A `developer` that finishes a change can sit idle while an external `reviewer` runs, then address the findings in place — don't collapse the chain into your own edits just because the steps are ordered. (The developer also self-reviews through its own `develop` loop and can request external review itself.)
 - **State the plan out loud before you spawn** — for any non-trivial task, name the goals, which agent each is assigned to, and the sequence. This surfaces your decomposition so the user can redirect it early; it's your own thinking made visible, the part you *don't* delegate.
-- **Effort-scale, don't over-spawn:** ~1 agent for a focused task, a few for a comparison or a parallel build, more only when responsibilities divide cleanly. Multi-agent runs cost 4–15× the tokens, so the lever is *how many* agents and *how deep* — never whether to delegate at all. A rule of thumb, not a race.
+- **Effort-scale, don't over-spawn** — the lever is *how many* agents and *how deep*, never whether to delegate at all. Sizing the count, and picking one-shot vs. named teammate vs. a `lead`, is the cost plan (below).
 - **One agent per independent part.** A multi-part fix defaults to one agent per part that can move on its own; you converge their results. Serialize only what genuinely can't overlap: **writes to the same tree** (partition, `isolation: worktree`, or sequence) and the **build → test → review loop** — that's one gate over one tree, run once on the converged result, not a race.
 
 ## Agents orchestrate too — two levels, one exception
 
-Every role agent but the PM carries `Agent`, so it can fan out **within its own role**: a developer splitting an independent-part fix across sub-developers, a reviewer running one agent per lens (correctness / security / perf / does-it-reproduce), a researcher sweeping sources in parallel, an architect drafting competing designs to compare. The same rules apply one level down — the brief stands alone, one writer per tree, converge before returning.
+Every role agent but the PM carries `Agent`, so it can fan out **within its own role**: a developer splitting an independent-part fix across sub-developers, a reviewer running one agent per lens (correctness / security / perf / does-it-reproduce), a researcher sweeping sources in parallel, an architect drafting competing designs to compare. The same rules apply one level down — the brief stands alone, one writer per tree, converge before returning. A role may also reach **across** to a different role when its own loop calls for it — most often a `developer` spawning a `reviewer` for a lighter external second opinion after its own `/code-review` (see `develop`); that still counts against the two-level cap.
 
 **The depth cap is two levels.** You spawn agents; *they* may spawn agents; **those are the last level** and do not spawn further. Whoever spawns states that in the brief — it's brief discipline, not a mechanical wall (the sub-agent has the same `tools:` as any agent of its type), so say it explicitly every time.
 
 **`/code-review` is exempt.** It fans out its own agents internally, and that never counts against the cap — a level-2 developer still runs the full review loop. Reviewing is a gate, not a delegation.
 
 The PM deliberately has **no** `Agent`: board writes are single-writer by design, and parallel Linear mutation is exactly how a board drifts.
+
+## The `lead` — hand off a whole goal
+
+When a goal is **big, clear, and multi-role** — a whole feature, a cross-cutting refactor, a spec-through-build stream — you can hand the *entire* goal to one **`lead`** agent instead of sequencing every micro-step yourself. A `lead` is a semi-orchestrator: it decomposes the goal, delegates each piece to the right worker (developer, architect-designer, reviewer, …), **verifies each returned goal was *achieved*** — it doesn't re-review the craft (a build's quality is the developer's own `/code-review` loop) — and iterates to production quality before reporting done. Two payoffs: it **collapses the back-and-forth** (you hold one goal, not twenty steps), and it lets you **run several big streams at once** (one `lead` each). It's a **level-1 orchestrator you spawn** — its workers are the leaves, and it never nests under another `lead`. Cost: it adds an orchestration layer, so reserve it for genuinely big goals — a small, clear goal still goes straight to a single `developer`. (Don't confuse a `lead`, the agent, with *you*, the team lead who spawns it.)
 
 ## The brief is the product
 
@@ -63,9 +68,14 @@ Agent Teams is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`): teammates sha
 - **Plan-approval gate — your "nothing runs off on its own" guardrail:** a teammate stays read-only until you approve its plan. Steer with criteria, not micromanagement.
 - **Experimental caveats:** teammates don't survive `/resume`, and task status can lag (a finished agent forgets to mark done, blocking dependents). Monitor the board, nudge a stuck task, keep the load-bearing path recoverable. Prefer in-process teammates over split-pane tmux (tmux orphans).
 
+## The cost plan
+
+Delegating is cheap by default and you scale *up* from there — the lever is always *how many* agents and *how deep*, **never whether** to delegate at all (multi-agent runs cost 4–15× the tokens, so spend deliberately). Default to an **unnamed one-shot** — spawn, it returns, it quiesces, nothing to stand down; most delegation is this. Reach for a **named teammate** only for a managed, multi-step stream you'll feed several board tasks, and `TaskStop` it when the run ends. Hand a **`lead`** one big, clear, multi-role goal so a single agent absorbs its whole back-and-forth. Then size the count to the work: ~1 agent for a focused task, a few for a comparison or a parallel build, more only when responsibilities divide cleanly. Cheap by default, heavier only where the work genuinely divides — that's the whole "not overly expensive" story. (One-shot vs. named mechanics live in the shared-task-board section above; the `lead` in its own section.)
+
 ## Coordinate
 
 - **Never two writers in one tree.** Partition by repo/dir, or give parallel writers `isolation: worktree` so each gets its own checkout, or sequence them. Hold your own edits to a repo while an agent writes there.
+- **Lane indicators for concurrent streams.** When several streams run at once, name each lane with a short **1–2 word intent** for what it achieves, announce them, and **prefix that name onto each spawned agent's description** — so a `developer` in the transaction-form lane reads as `tx-component: build the transaction form` (the UI already shows the agent's type and task; the lane name is all you add). A cheap naming convention, not machinery; it keeps parallel streams legible at a glance.
 - **Cleanup is the agent's job, not yours.** Each role agent owns the shells it starts and stops them before returning; anything long-lived goes through `hooks/spawn-managed.sh` so it's registered. The reaper (`hooks/reap-managed.sh`) guarantees only that **nothing outlives the session** — a subagent shares your CLI process, so it cannot clean up after an individual agent that forgot. If you find yourself killing a process an agent left behind, that's a bug in that agent's definition to fold back, not a chore to absorb. (That's the *shells inside* an agent. Standing down the *named teammates themselves* is a different thing and it **is** yours — the `TaskStop` close-out above.)
 
 ## The publish gate is yours alone
