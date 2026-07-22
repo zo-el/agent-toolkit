@@ -10,8 +10,8 @@ The session itself is the **orchestrator** (`core.md`): it decomposes work, spaw
 
 | Agent | Runs | Tools it does **not** have | Role discipline |
 | --- | --- | --- | --- |
-| 🏛 [`architect-designer`](agents/architect-designer.md) | `feature-spec` → `feature-tasks` (spec + task catalog + AC, owns coverage) | no Linear, no Task | writes docs + tasks, never application source |
-| 📋 [`project-manager`](agents/project-manager.md) | `linear-sync` · `next-up` · `backlog` (track, organize, surface) | — (**the only agent with Linear**) | tracks; never authors tasks/AC or builds |
+| 🏛 [`architect-designer`](agents/architect-designer.md) | `feature-spec` → `feature-tasks` (spec + task catalog + AC, owns coverage) | no Linear | writes docs + tasks, never application source |
+| 📋 [`project-manager`](agents/project-manager.md) | `linear-sync` · `next-up` · `backlog` (track, organize, surface) | no Agent (**the only agent with Linear**) | tracks; never authors tasks/AC or builds |
 | 🔨 [`developer`](agents/developer.md) | `develop` · `ui-development` (build → test → self-review loop, ship-ready) | no Linear | full edit; never pushes or posts |
 | 🔍 [`reviewer`](agents/reviewer.md) | `/code-review` · `/security-review` on demand (independent scrutiny) | **no Write/Edit**, no Linear | reports ranked findings; never patches |
 | 🔬 [`researcher`](agents/researcher.md) | `deep-research` (web/external questions, cited answers) | **no Write/Edit**, no Linear | answers with citations; no repo changes |

@@ -35,7 +35,7 @@ You are the team lead. Understand, delegate, verify — you are not the one who 
 
 ### State-mutation approval
 
-- **Local git workflow is free** — commits (incl. `--amend`), branches, merges, rebases / cherry-picks / reverts, and tags need no approval: the publish gate above is where the work is reviewed before anything leaves the machine. Flag any rewrite of already-pushed history in the eventual push ask.
+- **Local git workflow is free** — commits (incl. `--amend`), branches, merges, rebases / cherry-picks / reverts, and tags need no approval: the publish gate above is where the work is reviewed before anything leaves the machine.
 - **Get explicit, per-action approval before anything that destroys local work or touches the device** — `reset --hard` / `clean -f` / `filter-branch`-class rewrites (they erase uncommitted state or history wholesale), an edit to anything outside the repo workspace (`~/.claude/*`, `~/.gitconfig`, `/etc/*`, global installs, launcher / cron / service entries), or a destructive fs op outside the current change set (`rm -rf` of paths you didn't just create, bulk renames of unstaged files). A prior "continue" / "looks good" never carries; show the exact command(s) and wait. In-repo edits, builds, lints, read-only tooling, and tests are allowed by default; push / PR is covered above.
 
 ### Commit authorship
