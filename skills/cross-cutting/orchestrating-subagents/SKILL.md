@@ -52,15 +52,19 @@ The custom roles carry their own boundaries and the no-publish/no-attribution ru
 
 ## The shared task board (Agent Teams)
 
-Agent Teams is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`): teammates share a **task list with dependencies** (a task auto-unblocks when its dependency completes), a **peer mailbox**, and **file-locking** on task-claim. Use it as the single source of truth for a multi-agent run — create the tasks, let agents claim and complete them, and let completion events drive interleaving (don't poll).
+Agent Teams is enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`): teammates share a **task list with dependencies** (a task auto-unblocks when its dependency completes), a **peer mailbox**, and **file-locking** on task-claim. It's the single source of truth for a genuine multi-agent run — create the tasks, let teammates claim and complete them, let completion events drive interleaving (don't poll).
 
-- **Plan-approval gate:** teammates work read-only until you approve their plan — you own that judgment; steer with criteria, not micromanagement.
-- **It's experimental** — teammates don't survive `/resume`, and task status can lag (an agent finishes but forgets to mark done, blocking dependents). So **monitor** the board, nudge a stuck task, and keep the load-bearing path recoverable. Prefer **in-process** teammates over split-pane tmux (tmux sessions orphan).
+**Named = teammate; unnamed = one-shot — the `name` you pass to `Agent` is the lever** (not the tools it carries, not `run_in_background`; under teams every spawn is async either way). This is the distinction that used to leave agents idling:
+
+- **One-shot** — a review, a research question, a lookup, any "do X and report back" — **spawn it unnamed.** It returns in a single completion notification, then goes quiescent; nothing to stand down. This is most delegation.
+- **A managed teammate** — a persistent collaborator you'll assign several board tasks across a run — **name it.** After finishing, it idle-polls for its next task (the feature, not a leak). You own its lifecycle: assign its work, then **`TaskStop <name>` it when the run ends** — a "you're released" message only *wakes* it; `TaskStop` is what ends it.
+- **Plan-approval gate — your "nothing runs off on its own" guardrail:** a teammate stays read-only until you approve its plan. Steer with criteria, not micromanagement.
+- **Experimental caveats:** teammates don't survive `/resume`, and task status can lag (a finished agent forgets to mark done, blocking dependents). Monitor the board, nudge a stuck task, keep the load-bearing path recoverable. Prefer in-process teammates over split-pane tmux (tmux orphans).
 
 ## Coordinate
 
 - **Never two writers in one tree.** Partition by repo/dir, or give parallel writers `isolation: worktree` so each gets its own checkout, or sequence them. Hold your own edits to a repo while an agent writes there.
-- **Cleanup is the agent's job, not yours.** Each role agent owns the shells it starts and stops them before returning; anything long-lived goes through `hooks/spawn-managed.sh` so it's registered. The reaper (`hooks/reap-managed.sh`) guarantees only that **nothing outlives the session** — a subagent shares your CLI process, so it cannot clean up after an individual agent that forgot. If you find yourself killing a process an agent left behind, that's a bug in that agent's definition to fold back, not a chore to absorb.
+- **Cleanup is the agent's job, not yours.** Each role agent owns the shells it starts and stops them before returning; anything long-lived goes through `hooks/spawn-managed.sh` so it's registered. The reaper (`hooks/reap-managed.sh`) guarantees only that **nothing outlives the session** — a subagent shares your CLI process, so it cannot clean up after an individual agent that forgot. If you find yourself killing a process an agent left behind, that's a bug in that agent's definition to fold back, not a chore to absorb. (That's the *shells inside* an agent. Standing down the *named teammates themselves* is a different thing and it **is** yours — the `TaskStop` close-out above.)
 
 ## The publish gate is yours alone
 
