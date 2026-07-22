@@ -25,6 +25,7 @@ One home: never duplicate a rule across these layers — link to where it lives.
 - **Skill added/renamed:** sync into `~/.claude/skills` is automatic (SessionStart + on-skill-edit hooks) — confirm with `ls -l ~/.claude/skills/<name>`; tune the trigger description with `/skill-creator` eval when firing accuracy matters.
 - **Agent added/renamed:** agents are **copied** into `~/.claude/agents/` by `install.sh` (sync at SessionStart; the manifest prunes removed names) — run `./install.sh` after editing to make it live now, and confirm with `ls ~/.claude/agents/`.
 - **Hook changed:** extend `tests/run.sh` with the new case and run it — all green before commit. For the statusline, pipe a sample status JSON through `hooks/statusline.py`.
+  - **A fail-safe hook with an optional dependency** (an audio player, a sound file, an external binary) is tested for its *resolution logic*, not its side effect: drive it against a controlled fixture — a temp toolkit root with known files, a minimal `PATH` holding a fake binary — so the assertion is deterministic on any host, and skip or neutralize the part that genuinely needs the dependency when it's absent. The portable gate must stay green on a headless box with no audio at all.
 - **Wiring changed:** `./install.sh --dry-run` to preview the exact device-config diff, then `./install.sh` with the user's approval (it writes `~/.claude`).
 - **Anything renamed/removed:** grep the whole repo for the retired name (core.md's sweep-on-rename) — README and `orchestrating-subagents`' roster are the usual stragglers.
 

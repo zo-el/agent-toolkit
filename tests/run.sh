@@ -332,22 +332,77 @@ else
 fi
 rm -rf "$fh"
 
-# ── notify.sh: distinct sounds per kind, silent+success on unknown, override wins ──
-al="$(NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" alert)"
-dn="$(NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" done)"
-if [ -n "$al" ] && [ -n "$dn" ] && [ "$al" != "$dn" ]; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      alert and done must resolve to distinct sounds (alert=$al done=$dn)"
+# ── install.sh: a FOREIGN broken hook fails the doctor (exit 1) but must NOT ──
+# ── suppress the version stamp — only toolkit-owned problems gate the stamp   ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/nonexistent/foreign-hook.sh"}]}]}}\n' \
+  > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1; rc=$?
+if [ "$rc" -ne 0 ] && [ -s "$fh/.claude/agent-toolkit-version" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     foreign broken hook must fail the doctor yet still stamp the version (rc=$rc)"
 fi
-if [ -z "$(NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" bogus)" ] \
-   && NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" bogus >/dev/null 2>&1; then pass=$((pass + 1)); else
+rm -rf "$fh"
+
+# ── notify.sh: host-independent sound/player resolution, fail-safe on no audio ──
+# notify.sh emits (even under NOTIFY_DRYRUN) only when BOTH a sound and a player
+# resolve, and its fallbacks depend on which freedesktop sounds / players a host
+# ships. Asserting real output would false-fail on a headless box (no player) or
+# one carrying only bell.oga (alert and done both fall through to bell). So we
+# prove the RESOLUTION LOGIC against a self-contained toolkit root (known,
+# distinct override sounds) with a minimal PATH holding a FAKE player —
+# deterministic on any host — and prove the no-player path is silent success.
+nb="$(mktemp -d)"; tk="$nb/tk root"        # a space in the root proves single-arg
+mkdir -p "$nb/bin" "$nb/noaudio" "$tk/hooks" "$tk/sounds"
+cp "$root/hooks/notify.sh" "$tk/hooks/notify.sh"
+: > "$tk/sounds/alert.oga"; : > "$tk/sounds/done.oga"
+# Minimal PATHs: only the interpreter + externals notify.sh needs. $nb/bin also
+# carries a fake player; $nb/noaudio carries none (the headless-box case).
+for b in bash dirname setsid; do
+  bp="$(command -v "$b" 2>/dev/null)" && { ln -s "$bp" "$nb/bin/$b"; ln -s "$bp" "$nb/noaudio/$b"; }
+done
+# No real paplay/pw-play/aplay on this PATH, so the multi-word "ffplay …"
+# candidate is the one that resolves; it records its argv so we can prove the
+# flags word-split and the sound is passed as ONE final argument.
+cat > "$nb/bin/ffplay" <<EOF
+#!/bin/sh
+printf '%s\n' "\$@" > "$nb/argv"
+EOF
+chmod +x "$nb/bin/ffplay"
+dry() { PATH="$nb/bin" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" "$@"; }
+
+# (1) alert and done resolve to distinct, KNOWN sounds via the override branch —
+#     same result on any host; and the override is what wins (a fallback would
+#     give a /usr/share/... path, not these).
+al="$(dry alert)"; dn="$(dry done)"
+if [ -n "$al" ] && [ "${al#*|}" = "$tk/sounds/alert.oga" ] \
+   && [ "${dn#*|}" = "$tk/sounds/done.oga" ] && [ "$al" != "$dn" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      alert/done must resolve to distinct override sounds (alert=$al done=$dn)"
+fi
+
+# (2) unknown kind → silent and still exit 0 (never guesses a sound).
+if [ -z "$(dry bogus)" ] && dry bogus >/dev/null 2>&1; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL notify.sh      unknown kind must be silent and still exit 0"
 fi
-tmpd="$(mktemp -d)"; mkdir -p "$tmpd/sounds" "$tmpd/hooks"
-cp "$root/hooks/notify.sh" "$tmpd/hooks/notify.sh"; : > "$tmpd/sounds/alert.oga"
-if NOTIFY_DRYRUN=1 "$tmpd/hooks/notify.sh" alert | grep -q "$tmpd/sounds/alert.oga"; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      a toolkit sounds/ override must win over the system fallback"
+
+# (3) fail-safe: with NO player on PATH, notify.sh is silent and exits 0 — the
+#     headless-box contract that keeps this portable gate green with no audio.
+if [ -z "$(PATH="$nb/noaudio" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert)" ] \
+   && PATH="$nb/noaudio" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert >/dev/null 2>&1; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      no audio player must degrade to silent success"
 fi
-rm -rf "$tmpd"
+
+# (4) the multi-word player path: ffplay is selected, word-split into its flags,
+#     with the resolved sound (which contains a space) passed as ONE final arg —
+#     an unquoted "$sound" or a quoted "$player" would change the recorded argv.
+d="$(dry alert)"; snd="${d#*|}"; rm -f "$nb/argv"
+PATH="$nb/bin" "$tk/hooks/notify.sh" alert
+for i in 1 2 3 4 5; do [ -s "$nb/argv" ] && break; sleep 0.2; done
+printf -- '-nodisp\n-autoexit\n-loglevel\nquiet\n%s\n' "$snd" > "$nb/argv.want"
+if [ "${d%%|*}" = "ffplay" ] && diff -q "$nb/argv" "$nb/argv.want" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      multi-word ffplay must be selected with the sound as one final arg"
+fi
+rm -rf "$nb"
 
 # ── statusline: toolkit version segment shows the version, ⚠ only when stale ──
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"; ln -s "$root" "$fh/.claude/agent-toolkit"

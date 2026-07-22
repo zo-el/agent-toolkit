@@ -26,10 +26,17 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 POINTER="$CLAUDE_DIR/CLAUDE.md"
 MODE="${1:-full}"
 ts="$(date +%Y%m%d-%H%M%S)"
-problems=0
+problems=0      # every doctor problem — drives the exit code
+tk_problems=0   # toolkit-owned problems only — the version stamp is gated on
+                # these, so a FOREIGN broken hook (a user command in settings.json
+                # pointing at a missing path) can't suppress the freshness light.
 
 say()  { [ "$MODE" != "--sync" ] && echo "$@" || true; }
-warn() { echo "agent-toolkit doctor: ✗ $*"; problems=$((problems + 1)); }
+# A toolkit-wiring problem: counts against both the exit code and the stamp gate.
+warn() { echo "agent-toolkit doctor: ✗ $*"; problems=$((problems + 1)); tk_problems=$((tk_problems + 1)); }
+# A problem in the user's own (non-toolkit) settings: still reported and still
+# fails the doctor, but must not withhold the toolkit's own version stamp.
+warn_foreign() { echo "agent-toolkit doctor: ✗ $*"; problems=$((problems + 1)); }
 
 need() { command -v "$1" >/dev/null 2>&1 || warn "missing dependency: $1"; }
 need jq; need python3; need git
@@ -212,7 +219,14 @@ if [ -f "$SETTINGS" ] && command -v jq >/dev/null 2>&1; then
   while IFS= read -r cmd; do
     exe="${cmd%% *}"
     case "$exe" in
-      /*) [ -x "$exe" ] || warn "settings references missing/non-executable: $exe" ;;
+      /*) if [ ! -x "$exe" ]; then
+            # A toolkit-wired command lives under $STABLE; anything else is one
+            # of the user's own hooks — report it, but don't let it gate the stamp.
+            case "$exe" in
+              "$STABLE"/*) warn "settings references missing/non-executable: $exe" ;;
+              *)           warn_foreign "settings references a missing/non-executable (non-toolkit) command: $exe" ;;
+            esac
+          fi ;;
     esac
   done < <(jq -r '([.statusLine.command] + [.hooks[]?[]?.hooks[]?.command]) | .[]? // empty' "$SETTINGS" 2>/dev/null)
 fi
@@ -242,15 +256,18 @@ command -v paplay >/dev/null 2>&1 || command -v pw-play >/dev/null 2>&1 \
   || command -v ffplay >/dev/null 2>&1 || command -v aplay >/dev/null 2>&1 \
   || say "  ! no audio player (paplay/pw-play/ffplay/aplay) — notification sounds will be silent"
 
+# Stamp the installed version — the statusline shows it (v<count>·<sha>) and
+# flags ⚠ once the repo moves past it (a reinstall is pending). Full installs
+# only (--sync/--dry-run don't re-apply agents/settings, so they don't stamp),
+# and gated on toolkit-owned problems: once the toolkit's own wiring is applied,
+# a FOREIGN broken hook must not withhold the "changes are applied" light.
+if [ "$MODE" = "full" ] && [ "$tk_problems" -eq 0 ] && git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
+  printf 'v%s·%s\n' \
+    "$(git -C "$ROOT" rev-list --count HEAD)" \
+    "$(git -C "$ROOT" rev-parse --short HEAD)" > "$CLAUDE_DIR/agent-toolkit-version"
+fi
+
 if [ "$problems" -eq 0 ]; then
-  # Stamp the installed version — the statusline shows it (v<count>·<sha>) and
-  # flags ⚠ once the repo moves past it (a reinstall is pending). Full installs
-  # only: --sync/--dry-run don't re-apply agents/settings, so they don't stamp.
-  if [ "$MODE" = "full" ] && git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
-    printf 'v%s·%s\n' \
-      "$(git -C "$ROOT" rev-list --count HEAD)" \
-      "$(git -C "$ROOT" rev-parse --short HEAD)" > "$CLAUDE_DIR/agent-toolkit-version"
-  fi
   say "✓ doctor: all checks green ($have skills, hooks wired via $STABLE)"
 else
   say "doctor: $problems problem(s) above"
