@@ -6,7 +6,7 @@ Grown out of the [unyt workshop](https://github.com/unytco) — the workshop's `
 
 ## The model — one orchestrator, role agents
 
-The session itself is the **orchestrator** (`core.md`): it decomposes work, spawns the role agents, consolidates their results, and is the only one that talks to the user or publishes. Each agent runs in its own isolated context, with a `tools:` allowlist as its outer limit and its definition as the role it keeps inside that limit:
+The session itself is the **pure orchestrator** (`core.md`): it thinks, decomposes work, delegates every piece of execution to the role agents, verifies and consolidates what they return, and is the only one that talks to the user or publishes — it never does the execution work itself. Each agent runs in its own isolated context, with a `tools:` allowlist as its outer limit and its definition as the role it keeps inside that limit:
 
 | Agent | Runs | Tools it does **not** have | Role discipline |
 | --- | --- | --- | --- |
