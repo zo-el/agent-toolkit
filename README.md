@@ -55,6 +55,7 @@ git clone git@github.com:zo-el/agent-toolkit.git && cd agent-toolkit
 - **copies** every agent into `~/.claude/agents/` (copied, not symlinked — the agents file-watcher doesn't reliably follow symlinks; a manifest prunes renamed/removed ones without touching your own agents);
 - points `statusLine` and all hooks in `~/.claude/settings.json` at [`hooks/`](hooks/) — a jq merge that replaces toolkit-managed entries, preserves everything else, and backs the original up to `~/.claude/backups/` first — and sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (the shared task list / teammate coordination layer the orchestrator uses);
 - writes the one-line device pointer `~/.claude/CLAUDE.md` → the toolkit's [`CLAUDE.md`](CLAUDE.md) (whose import chain pulls in `core.md`);
+- stamps the installed version (`~/.claude/agent-toolkit-version`, from the toolkit's git) so the statusline can show it and flag drift;
 - runs a doctor: every wired path must exist and be executable, agents fully copied.
 
 **It never goes stale by itself.** `SessionStart` re-runs `install.sh --sync` (symlink + skills + doctor) at every session start — new skills pulled from another machine are live by the next session, and a broken install prints its diagnosis into the session context, where the agent will see and surface it. A `PostToolUse` hook re-syncs the moment a skill file is edited ([`hooks/sync-on-skill-edit.sh`](hooks/sync-on-skill-edit.sh), path-gated so unrelated edits don't trigger it).
@@ -81,7 +82,19 @@ Layering, honestly: these hooks are the *policy* layer and fail open if `jq` is 
 
 ## Statusline
 
-[`hooks/statusline.py`](hooks/statusline.py) (python3, stdlib-only — no npm/node at render time) shows, at all times: model (+`1M` context marker) · reasoning effort · context bar and % · session cost and lines changed · rate-limit usage · git branch+dirty · directory. It reads the native statusline JSON fields first (`effort.level`, `context_window.*`, Claude Code ≥ 2.1.119) and falls back to transcript + settings scanning on older versions; every segment fails silent — the line itself never breaks.
+[`hooks/statusline.py`](hooks/statusline.py) (python3, stdlib-only — no npm/node at render time) shows, at all times: model (+`1M` context marker) · reasoning effort · context bar and % · session cost and lines changed · rate-limit usage · git branch+dirty · directory · **toolkit version + freshness**. It reads the native statusline JSON fields first (`effort.level`, `context_window.*`, Claude Code ≥ 2.1.119) and falls back to transcript + settings scanning on older versions; every segment fails silent — the line itself never breaks.
+
+The version segment (`⬡ v<count>·<sha>`) is your "are my changes applied?" light. `install.sh` stamps it at each full install from the toolkit's own git (`git rev-list --count` + short SHA — auto, no manual bumping); the statusline reads that stamp and appends a `⚠` when the repo's HEAD has since moved past it — i.e. you committed and haven't re-run `./install.sh`. (Skills and `core.md` are live through the symlink regardless; the `⚠` nudges re-applying the *copied* pieces — agents and `settings.json`.)
+
+## Notifications
+
+[`hooks/notify.sh`](hooks/notify.sh) plays a sound **only when it's your turn** — so you can keep your eyes off the screen until you're actually needed:
+
+- **`Notification` → `alert`** (a distinct, attention-grabbing sound): Claude needs a permission or is asking a question.
+- **`Stop` → `done`** (a softer completion sound): the main agent finished its turn and the reply is ready.
+- **`SubagentStop` is deliberately *not* wired** — a background agent finishing is not your cue to look, so it stays silent.
+
+The kind is passed as an argument (`notify.sh alert` / `notify.sh done`), so the hook never misreads a payload. It's cheap (a detached `paplay`/`pw-play`/`ffplay`/`aplay` of a ~20 KB sound) and fail-safe — no player or no sound file degrades to silence, never to an error. Override either cue by dropping `sounds/<kind>.<ext>` (oga/ogg/wav/mp3) in the toolkit; otherwise a distinct [freedesktop](https://www.freedesktop.org/wiki/Specifications/sound-theme-spec/) sound is used. `install.sh` wires these two events and disables the external `claude-notifications-go` plugin it replaces (so nothing plays twice).
 
 ## Layout & lifecycle
 

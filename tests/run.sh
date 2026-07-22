@@ -332,6 +332,36 @@ else
 fi
 rm -rf "$fh"
 
+# ── notify.sh: distinct sounds per kind, silent+success on unknown, override wins ──
+al="$(NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" alert)"
+dn="$(NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" done)"
+if [ -n "$al" ] && [ -n "$dn" ] && [ "$al" != "$dn" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      alert and done must resolve to distinct sounds (alert=$al done=$dn)"
+fi
+if [ -z "$(NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" bogus)" ] \
+   && NOTIFY_DRYRUN=1 "$root/hooks/notify.sh" bogus >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      unknown kind must be silent and still exit 0"
+fi
+tmpd="$(mktemp -d)"; mkdir -p "$tmpd/sounds" "$tmpd/hooks"
+cp "$root/hooks/notify.sh" "$tmpd/hooks/notify.sh"; : > "$tmpd/sounds/alert.oga"
+if NOTIFY_DRYRUN=1 "$tmpd/hooks/notify.sh" alert | grep -q "$tmpd/sounds/alert.oga"; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      a toolkit sounds/ override must win over the system fallback"
+fi
+rm -rf "$tmpd"
+
+# ── statusline: toolkit version segment shows the version, ⚠ only when stale ──
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"; ln -s "$root" "$fh/.claude/agent-toolkit"
+realsha="$(git -C "$root" rev-parse --short HEAD)"
+printf 'v50·%s\n' "$realsha" > "$fh/.claude/agent-toolkit-version"
+out_fresh="$(printf '{}' | HOME="$fh" python3 "$root/hooks/statusline.py" 2>/dev/null)"
+printf 'v49·0000000\n' > "$fh/.claude/agent-toolkit-version"
+out_stale="$(printf '{}' | HOME="$fh" python3 "$root/hooks/statusline.py" 2>/dev/null)"
+if printf '%s' "$out_fresh" | grep -q "v50·$realsha" && ! printf '%s' "$out_fresh" | grep -q '⚠' \
+   && printf '%s' "$out_stale" | grep -q '⚠'; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL statusline.py  toolkit version segment / stale ⚠ marker wrong"
+fi
+rm -rf "$fh"
+
 echo "────────────────────────────────"
 echo "pass: $pass  fail: $fail"
 [ "$fail" -eq 0 ]

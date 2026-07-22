@@ -7,6 +7,8 @@ description: Change the agent-toolkit itself — add or revise a skill, hook, ag
 
 The toolkit is a repo with the same discipline as production code — edit → verify → review → gated commit/push — because its consumers are every future session on every machine. Device config reaches it only through the `~/.claude/agent-toolkit` symlink; `readlink` that for the real checkout.
 
+**Dogfood it.** You run *on* this toolkit while you build it, so any session carries a standing lens: notice the friction you hit, the gate that was missing, the rule that would have helped *this* task — and fold it back the same session (surface it to the user, land it under the gates below). Working *inside* this repo sharpens the lens further, but the best source of improvements is simply using the thing. Don't let a lesson evaporate because the task was "done."
+
 ## Where a change lands (first decision, in order)
 
 - **Always-true principle, every task** → `core.md` — a sentence, not a section; it loads every session, so it must stay small.

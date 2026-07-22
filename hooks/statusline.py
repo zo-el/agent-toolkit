@@ -210,6 +210,36 @@ def segment_git(cwd):
     return f"{COLORS['cyan']}⎇ {branch}{dirty}{RESET}"
 
 
+def segment_toolkit():
+    # Toolkit version + freshness — the "are my changes applied?" light.
+    # The label is written by `install.sh` at each full install (v<count>·<sha>),
+    # so it reflects exactly what was last wired. A ⚠ appears when the toolkit
+    # repo's HEAD has moved past that — i.e. commit-then-forgot-to-reinstall —
+    # via one cheap `rev-parse` (no per-render `rev-list`). Skills/core.md are
+    # live through the symlink regardless; ⚠ nudges re-applying agents/settings.
+    try:
+        with open(os.path.join(HOME, ".claude", "agent-toolkit-version")) as f:
+            label = f.read().strip()
+    except OSError:
+        return None
+    if not label:
+        return None
+    stale = ""
+    m = re.search(r"·([0-9a-f]+)", label)
+    if m:
+        try:
+            cur = subprocess.run(
+                ["git", "-C", os.path.join(HOME, ".claude", "agent-toolkit"),
+                 "rev-parse", "--short", "HEAD"],
+                capture_output=True, text=True, timeout=0.2,
+            ).stdout.strip()
+            if cur and cur != m.group(1):
+                stale = f"{COLORS['yellow']}⚠{RESET}"
+        except Exception:
+            pass
+    return f"{DIM}⬡ {label}{RESET}{stale}"
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -234,6 +264,7 @@ def main():
         lambda: segment_limits(data),
         lambda: segment_git(cwd),
         lambda: f"{DIM}{os.path.basename(cwd)}{RESET}",
+        lambda: segment_toolkit(),
     ):
         try:
             seg = build()

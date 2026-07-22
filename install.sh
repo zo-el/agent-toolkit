@@ -111,6 +111,10 @@ desired_settings() {
     # and re-introduce a prompt exactly where it matters (push, PR, comments as
     # the user, reset --hard, ~/.claude, Linear writes).
     | .permissions = ((.permissions // {}) + {defaultMode: "auto"})
+    # Superseded by hooks/notify.sh — disable the external notifications plugin
+    # so a sound is not played twice (no-op if it was never installed).
+    | (if (.enabledPlugins // {} | has("claude-notifications-go@claude-notifications-go"))
+       then .enabledPlugins["claude-notifications-go@claude-notifications-go"] = false else . end)
     | .statusLine = {type: "command", command: ($base + "/hooks/statusline.py"), padding: 0}
     | .hooks.SessionStart = clean(.hooks.SessionStart) + [{
         matcher: "startup|resume|clear",
@@ -131,6 +135,13 @@ desired_settings() {
         hooks: [{type: "command", command: ($base + "/hooks/reap-managed.sh")}]}]
     | .hooks.SessionEnd = clean(.hooks.SessionEnd) + [{
         hooks: [{type: "command", command: ($base + "/hooks/reap-managed.sh")}]}]
+    # Sound only when it is your turn: a permission/question prompt (Notification)
+    # and the main agent finishing (Stop). Not SubagentStop — background agents
+    # stay silent. hooks/notify.sh takes the kind as an argument.
+    | .hooks.Notification = clean(.hooks.Notification) + [{
+        hooks: [{type: "command", command: ($base + "/hooks/notify.sh alert")}]}]
+    | .hooks.Stop = clean(.hooks.Stop) + [{
+        hooks: [{type: "command", command: ($base + "/hooks/notify.sh done")}]}]
     | .hooks |= with_entries(select((.value | length) > 0))
   ' "$1"
 }
@@ -225,8 +236,21 @@ for a in "$ROOT"/agents/*.md; do
   cmp -s "$a" "$CLAUDE_DIR/agents/$(basename "$a")" 2>/dev/null && agents_copied=$((agents_copied + 1))
 done
 [ "$MODE" = "--dry-run" ] || [ "$agents_copied" -ge "$agents_have" ] || warn "only $agents_copied of $agents_have toolkit agents are installed/current — run: $STABLE/install.sh"
+# Notification sounds are best-effort — a missing player degrades to silence,
+# not a failed install; just tell the user so it isn't a silent surprise.
+command -v paplay >/dev/null 2>&1 || command -v pw-play >/dev/null 2>&1 \
+  || command -v ffplay >/dev/null 2>&1 || command -v aplay >/dev/null 2>&1 \
+  || say "  ! no audio player (paplay/pw-play/ffplay/aplay) — notification sounds will be silent"
 
 if [ "$problems" -eq 0 ]; then
+  # Stamp the installed version — the statusline shows it (v<count>·<sha>) and
+  # flags ⚠ once the repo moves past it (a reinstall is pending). Full installs
+  # only: --sync/--dry-run don't re-apply agents/settings, so they don't stamp.
+  if [ "$MODE" = "full" ] && git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
+    printf 'v%s·%s\n' \
+      "$(git -C "$ROOT" rev-list --count HEAD)" \
+      "$(git -C "$ROOT" rev-parse --short HEAD)" > "$CLAUDE_DIR/agent-toolkit-version"
+  fi
   say "✓ doctor: all checks green ($have skills, hooks wired via $STABLE)"
 else
   say "doctor: $problems problem(s) above"
