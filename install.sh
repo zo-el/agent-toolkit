@@ -106,10 +106,23 @@ fi
 
 # ── 3. settings.json: statusline + hooks on the stable path ─────────────────
 desired_settings() {
-  jq --arg base "$STABLE" '
+  jq --arg base "$STABLE" --arg cfg "$CLAUDE_DIR" --arg root "$ROOT" '
     def ours: test("agent-toolkit|install-skills");
     def clean(a): (a // [])
       | map(select((((.hooks // []) | map(.command // "") | join(" ")) | ours) | not));
+    # In a permission rule path, a DOUBLED leading slash is what means absolute:
+    # a single slash anchors the pattern at the settings directory instead of the
+    # filesystem root, so dropping one slash makes the rule match nothing.
+    def reads: (["plugins", "agents", "skills"] | map("Read(/" + $cfg + "/" + . + "/**)"))
+      # projects/ is narrowed to the memory directories: agent memory is read all
+      # the time, while the session transcripts sitting beside it can contain
+      # anything ever pasted into a session. Rules match with gitignore semantics,
+      # so a mid-pattern ** spans any number of directories.
+      + ["Read(/" + $cfg + "/projects/**/memory/**)"]
+      # Every ~/.claude/skills entry is a symlink into this checkout, and a read
+      # is allowed only when the resolved realpath matches a rule too — so the
+      # skill reads need the checkout itself, not just the symlink directory.
+      + ["Read(/" + $root + "/**)"];
     .env = ((.env // {}) + {CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"})
     # Auto mode: Claude judges each command itself instead of prompting for
     # everything — so background agents finish their work unattended, and no
@@ -118,6 +131,14 @@ desired_settings() {
     # and re-introduce a prompt exactly where it matters (push, PR, comments as
     # the user, reset --hard, ~/.claude, Linear writes).
     | .permissions = ((.permissions // {}) + {defaultMode: "auto"})
+    # Agents read plugin, agent and skill definitions and project memory under
+    # ~/.claude constantly, and a read outside the workspace prompts even in auto
+    # mode — stalling a background agent on a human who is not watching. Only the
+    # paths above are pre-approved, and READ-only: settings.json (MCP plugins keep
+    # API tokens in it), .credentials* and the session transcripts match none of
+    # them, and a Read rule cannot loosen the config writes guard-config.sh gates.
+    # Ours are dropped before being re-appended, so the merge stays idempotent.
+    | .permissions.allow = (((.permissions.allow // []) - reads) + reads)
     # Enable pr-review-toolkit: the developer and reviewer self-review gate spawns
     # its agents (code-reviewer, silent-failure-hunter, etc.) on the local git diff.
     # The bundled /code-review is user-invocable only — a human pre-push gate, never

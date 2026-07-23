@@ -61,6 +61,12 @@ git clone git@github.com:zo-el/agent-toolkit.git && cd agent-toolkit
 
 **It never goes stale by itself.** `SessionStart` re-runs `install.sh --sync` (symlink + skills + doctor) at every session start — new skills pulled from another machine are live by the next session, and a broken install prints its diagnosis into the session context, where the agent will see and surface it. A `PostToolUse` hook re-syncs the moment a skill file is edited ([`hooks/sync-on-skill-edit.sh`](hooks/sync-on-skill-edit.sh), path-gated so unrelated edits don't trigger it).
 
+Provision the `pr-review-toolkit` plugin once — it carries the review agents (`code-reviewer` and its specialists) every agent spawns as its review gate, so without it that gate has nothing to run. `install.sh` writes the `enabledPlugins` entry, but enabling is not installing; each machine still needs:
+
+```bash
+command -v claude >/dev/null && claude plugin install pr-review-toolkit@claude-plugins-official --scope user
+```
+
 Provision the `skill-creator` plugin once (the skill-authoring skill uses it to test/tune skills):
 
 ```bash
@@ -78,6 +84,8 @@ command -v claude >/dev/null && claude plugin install skill-creator@claude-plugi
 - These guard hooks fire **inside subagents too**, so an agent's stray `git push` still hits the approval gate — belt-and-suspenders with each agent's `tools:` allowlist.
 
 The installer also sets `permissions.defaultMode: "auto"`, so Claude judges routine commands itself instead of prompting for each — that is what lets a background agent finish unattended, and it means no hand-maintained list of build/test commands to keep current. The hooks above fire *independently of permission mode*, so every gate they own still prompts. The honest trade: in-workspace destructive commands (`rm -rf ./build`) no longer stop for a prompt — out-of-workspace ones still do, and git is the net for anything in the repo.
+
+It also pre-approves a short list of **reads** (`permissions.allow`), because a read outside the workspace prompts even in auto mode — which stalls a background agent on a human who isn't watching. Exactly five paths, all read-only: `~/.claude/plugins`, `~/.claude/agents`, `~/.claude/skills`, each project's `memory/` directory under `~/.claude/projects`, and this checkout (the skills are symlinks into it, and a read is allowed only when the resolved path matches a rule too). Nothing else — `settings.json` (MCP plugins keep API tokens in it), `.credentials*` and the session transcripts sitting beside the memory dirs all stay gated, and **writes** into `~/.claude` still hit `guard-config.sh` above: allowing a read never loosens a write.
 
 Layering, honestly: these hooks are the *policy* layer and fail open if `jq` is missing (the doctor flags that). For a hard wall beneath them, enable Claude Code's native OS sandbox (`/sandbox`, bubblewrap) — it blocks stray writes at the kernel level, including to `settings.json` itself. Worth knowing before you do: it also confines what Claude's own commands can reach (writes outside cwd, network beyond an allowlist), which can break agent work that needs a local service.
 

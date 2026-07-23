@@ -359,6 +359,45 @@ if jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true
 fi
 rm -rf "$fh"
 
+# ── install.sh: reads of the non-secret ~/.claude dirs are pre-approved ──────
+# Reads outside the workspace prompt even in auto mode, which stalls a background
+# agent on a human. Seed a settings.json that already carries every permissions
+# field, so one assertion covers every failure mode: the entries missing (the
+# same single-quoted-jq trap as above), the merge dropping fields the user set,
+# a secret-bearing path (settings.json / credentials / a blanket ~/.claude/**)
+# creeping into the allowlist, the blanket projects rule returning (only the
+# memory dirs are readable — the session transcripts beside them stay gated),
+# and the checkout rule going missing (every ~/.claude/skills entry is a symlink
+# into the checkout, and a read is allowed only when the resolved realpath
+# matches a rule too). Paths follow HOME, and the DOUBLED leading slash is the
+# part that means absolute — a single slash would anchor the pattern at the
+# settings directory and match nothing. Installing twice must change nothing:
+# our rules are dropped before being re-appended.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '%s\n' '{"permissions":{"allow":["Bash(ls:*)"],"deny":["Read(//etc/shadow)"],"ask":["Bash(curl:*)"],"additionalDirectories":["/srv/shared"],"defaultMode":"plan"}}' \
+  > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+cp "$fh/.claude/settings.json" "$fh/pass1.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if cmp -s "$fh/pass1.json" "$fh/.claude/settings.json" \
+   && jq -e --arg cfg "$fh/.claude" --arg co "$(cd "$root" && pwd -P)" '
+      ((["plugins","agents","skills"] | map("Read(/" + $cfg + "/" + . + "/**)"))
+       + ["Read(/" + $cfg + "/projects/**/memory/**)", "Read(/" + $co + "/**)"]) as $want
+      | (.permissions.allow // []) as $got
+      | ($want - $got) == []
+        and ($got | index("Read(/" + $cfg + "/projects/**)")) == null
+        and ($got | length) == ($got | unique | length)
+        and ($got | index("Bash(ls:*)")) != null
+        and .permissions.deny == ["Read(//etc/shadow)"]
+        and .permissions.ask == ["Bash(curl:*)"]
+        and .permissions.additionalDirectories == ["/srv/shared"]
+        and .permissions.defaultMode == "auto"
+        and ($got | map(select(test("credentials|settings\\.json|\\.claude/\\*\\*"))) | length) == 0
+    ' "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     read allowlist wrong: a rule missing (checkout/memory), the blanket projects rule back, a permissions field dropped, a secret path leaked, or not idempotent"
+fi
+rm -rf "$fh"
+
 # ── notify.sh: host-independent sound/player resolution, fail-safe on no audio ──
 # notify.sh emits (even under NOTIFY_DRYRUN) only when BOTH a sound and a player
 # resolve, and its fallbacks depend on which freedesktop sounds / players a host
