@@ -359,19 +359,22 @@ if jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true
 fi
 rm -rf "$fh"
 
-# ── install.sh: the .env merge writes both toolkit env vars, keeping yours ─────
-# ENABLE_TASKS=0 restores TodoWrite (the Ctrl+T checklist the lead can maintain —
-# TaskCreate is teammate-only, so the shared board renders empty for the
-# orchestrator). Same silent single-quoted-jq trap as above, so seed an unrelated
-# .env key and prove one install adds BOTH vars while preserving it.
+# ── install.sh: the .env merge writes the toolkit env var, keeping yours ──────
+# AGENT_TEAMS=1 is the only env var the toolkit sets. CLAUDE_CODE_ENABLE_TASKS=0
+# was set here briefly and reverted (the task list is gated server-side, so it
+# never brought TodoWrite back), so the merge must also DELETE it from a
+# settings.json a previous install wrote it into — an additive merge would strand
+# the dead key. Same silent single-quoted-jq trap as above, so seed both the
+# retired key and an unrelated one: one assertion then covers the var going
+# missing, the dead flag surviving, and your own key being clobbered.
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
-printf '{"env":{"MY_OWN_VAR":"keep"}}\n' > "$fh/.claude/settings.json"
+printf '{"env":{"MY_OWN_VAR":"keep","CLAUDE_CODE_ENABLE_TASKS":"0"}}\n' > "$fh/.claude/settings.json"
 HOME="$fh" "$root/install.sh" >/dev/null 2>&1
-if jq -e '.env.CLAUDE_CODE_ENABLE_TASKS == "0"
-          and .env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS == "1"
+if jq -e '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS == "1"
+          and (.env | has("CLAUDE_CODE_ENABLE_TASKS") | not)
           and .env.MY_OWN_VAR == "keep"' \
      "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: a toolkit env var missing (the single-quoted-jq trap) or your own .env key clobbered"
+  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: AGENT_TEAMS missing (the single-quoted-jq trap), the retired ENABLE_TASKS not cleaned out, or your own .env key clobbered"
 fi
 rm -rf "$fh"
 
