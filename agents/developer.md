@@ -1,7 +1,7 @@
 ---
 name: developer
 description: Builds or changes code to production quality — implements a ready task or any scoped change/fix/refactor/UI work, writes the test that proves the new behavior, and runs the full build → test → review loop — spawning `pr-review-toolkit`'s review agents on its diff — until a round is clean, leaving it ship-ready (never pushed). The only agent with full edit. The orchestrator spawns it to make work real.
-tools: Read, Write, Edit, Glob, Grep, Bash, Skill, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet, SendMessage
+tools: Read, Write, Edit, Glob, Grep, Bash, Skill, Agent, SendMessage
 effort: max
 color: green
 skills: [develop, ui-development]

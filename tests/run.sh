@@ -359,6 +359,22 @@ if jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true
 fi
 rm -rf "$fh"
 
+# ── install.sh: the .env merge writes both toolkit env vars, keeping yours ─────
+# ENABLE_TASKS=0 restores TodoWrite (the Ctrl+T checklist the lead can maintain —
+# TaskCreate is teammate-only, so the shared board renders empty for the
+# orchestrator). Same silent single-quoted-jq trap as above, so seed an unrelated
+# .env key and prove one install adds BOTH vars while preserving it.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"env":{"MY_OWN_VAR":"keep"}}\n' > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if jq -e '.env.CLAUDE_CODE_ENABLE_TASKS == "0"
+          and .env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS == "1"
+          and .env.MY_OWN_VAR == "keep"' \
+     "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: a toolkit env var missing (the single-quoted-jq trap) or your own .env key clobbered"
+fi
+rm -rf "$fh"
+
 # ── install.sh: reads of the non-secret ~/.claude dirs are pre-approved ──────
 # Reads outside the workspace prompt even in auto mode, which stalls a background
 # agent on a human. Seed a settings.json that already carries every permissions

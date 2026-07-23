@@ -123,7 +123,16 @@ desired_settings() {
       # is allowed only when the resolved realpath matches a rule too — so the
       # skill reads need the checkout itself, not just the symlink directory.
       + ["Read(/" + $root + "/**)"];
-    .env = ((.env // {}) + {CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"})
+    # ENABLE_TASKS=0 restores TodoWrite — the Ctrl+T session checklist — which has
+    # been off by default since Claude Code v2.1.142, superseded by TaskCreate/Get/
+    # List/Update. Those Task tools are surfaced to TEAMMATES, not to the lead
+    # session: the orchestrator has no TaskCreate, so it cannot put anything on that
+    # board and the board renders empty. TodoWrite it does have, so the lead keeps a
+    # visible, updating checklist of its lanes. The trade is the shared team board,
+    # which never populated for this workflow; named teammates and SendMessage are
+    # unaffected. Env vars, so both apply at the next session start.
+    .env = ((.env // {}) + {CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1",
+                            CLAUDE_CODE_ENABLE_TASKS: "0"})
     # Auto mode: Claude judges each command itself instead of prompting for
     # everything — so background agents finish their work unattended, and no
     # hand-maintained list of build/test commands can go stale. It is safe here
