@@ -106,6 +106,15 @@ fi
 
 # ── 3. settings.json: statusline + hooks on the stable path ─────────────────
 desired_settings() {
+  # NB: no apostrophes in this jq program — it is a single-quoted shell argument,
+  # and bash -n does NOT catch a stray one: one trips it, but TWO balance out, so
+  # the script parses and jq is silently handed a program TRUNCATED at the first
+  # of them — at best empty output and a cheerful "already current", at worst a
+  # settings.json written without every rule below that line — statusline and
+  # every guard hook gone, silently. The guards are the apostrophe count (exactly
+  # 2 — the delimiters below), the env-merge and full-wiring cases in tests/run.sh
+  # (the latter asserts the TAIL of this program lands), and the doctor check in
+  # section 5 that the wiring is present at all.
   jq --arg base "$STABLE" --arg cfg "$CLAUDE_DIR" --arg root "$ROOT" '
     def ours: test("agent-toolkit|install-skills");
     def clean(a): (a // [])
@@ -123,11 +132,13 @@ desired_settings() {
       # is allowed only when the resolved realpath matches a rule too — so the
       # skill reads need the checkout itself, not just the symlink directory.
       + ["Read(/" + $root + "/**)"];
-    # The del is cleanup, not config: CLAUDE_CODE_ENABLE_TASKS=0 was set here
-    # briefly and reverted (the task list is gated server-side, so it never brought
-    # TodoWrite back). A purely additive merge would leave the dead key in every
-    # settings.json a previous install wrote it into, ready to disable the feature
-    # for real if it is ever ungated.
+    # The del is cleanup, not config: CLAUDE_CODE_ENABLE_TASKS=0 is a real switch —
+    # it turns the four Task tools off in favor of the older TodoWrite checklist.
+    # Set here briefly and reverted: it could not help, because a server-side flag
+    # keyed to the model was suppressing the Task tools and TodoWrite alike. A purely
+    # additive merge would leave a stale =0 in every settings.json a previous install
+    # wrote it into, genuinely disabling the Task tools once that flag lifts — so the
+    # merge deletes the key instead of merely ceasing to write it.
     .env = ((.env // {}) + {CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"}
             | del(.CLAUDE_CODE_ENABLE_TASKS))
     # Auto mode: Claude judges each command itself instead of prompting for
@@ -151,7 +162,6 @@ desired_settings() {
     # callable by a subagent — so enabling this is what gives the agents a review
     # gate at all. (Takes effect once the plugin is installed/cached; if it is not,
     # the user runs: /plugin install pr-review-toolkit@claude-plugins-official)
-    # NB: no apostrophes in this jq program — it is a single-quoted shell argument.
     | .enabledPlugins["pr-review-toolkit@claude-plugins-official"] = true
     # Superseded by hooks/notify.sh — disable the external notifications plugin
     # so a sound is not played twice (no-op if it was never installed).
@@ -264,6 +274,39 @@ if [ -f "$SETTINGS" ] && command -v jq >/dev/null 2>&1; then
           fi ;;
     esac
   done < <(jq -r '([.statusLine.command] + [.hooks[]?[]?.hooks[]?.command]) | .[]? // empty' "$SETTINGS" 2>/dev/null)
+fi
+# …and our wiring must be PRESENT, not merely valid. The loop above only checks
+# the paths it FINDS in settings, so a settings.json that lost the statusline and
+# every hook — what a truncated merge program writes, see the NB in section 3 —
+# sails through it with nothing left to check, and the next --sync compares that
+# file against the same truncated output and calls it current. So the whole guard
+# layer can go missing while both gates report green; this is the check that
+# notices its own absence. Events are read from the merge program itself, so one
+# wired tomorrow is covered the day it lands. Membership uses the same
+# agent-toolkit marker the merge uses to recognize its own entries: whether those
+# paths are current or exist at all is the staleness and path checks above. This
+# asks only whether ours are PRESENT — never that nothing else is, so the hooks
+# you wire yourself are none of its business.
+# Skipped in --dry-run, where the file on disk is the BEFORE state this run fixes.
+if [ "$MODE" != "--dry-run" ] && [ -f "$SETTINGS" ] && command -v jq >/dev/null 2>&1; then
+  wired="$(grep -oE '\.hooks\.[A-Za-z]+ = clean\([^)]*\) \+ \[' "$ROOT/install.sh" \
+    | grep -oE '\.hooks\.[A-Za-z]+' | cut -d. -f3 | sort -u)"
+  if ! gone="$(jq -r --arg want "$wired" '
+    . as $s
+    | ($want | split("\n") | map(select(length > 0))) as $want_ev
+    | (($s.hooks // {}) | to_entries
+       | map(select((.value | map((.hooks // []) | map(.command // ""))
+                     | flatten | join(" ")) | test("agent-toolkit")))
+       | map(.key)) as $have_ev
+    | (if (($s.statusLine.command // "") | test("agent-toolkit")) then [] else ["statusLine"] end)
+      + (($want_ev - $have_ev) | map("hooks." + .))
+    | join(", ")' "$SETTINGS" 2>/dev/null)"; then
+    warn "settings.json is unreadable, so the toolkit wiring cannot be verified — run: $STABLE/install.sh"
+  elif [ -z "$wired" ]; then
+    warn "no wired hook events found in the settings merge program — the wiring check cannot verify anything"
+  elif [ -n "$gone" ]; then
+    warn "settings.json is missing toolkit wiring ($gone) — run: $STABLE/install.sh"
+  fi
 fi
 for f in "$ROOT"/hooks/*.sh "$ROOT"/hooks/*.py "$ROOT/install-skills.sh"; do
   [ -x "$f" ] || warn "not executable: $f"

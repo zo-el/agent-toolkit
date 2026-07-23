@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: The adversary work must survive — scrutinizes a diff, spec, plan, or task catalog and reports ranked findings without patching. Read-only. The orchestrator spawns it for an independent verification pass, a second opinion on a risky change, or to check a spec/plan before it's committed to. Distinct from the developer's own in-loop self-review.
-tools: Read, Glob, Grep, Bash, Skill, Agent, SendMessage
+tools: Read, Glob, Grep, Bash, Skill, Agent, TaskUpdate, TaskList, TaskGet, SendMessage
 effort: max
 color: red
 ---

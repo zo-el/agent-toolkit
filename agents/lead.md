@@ -1,7 +1,7 @@
 ---
 name: lead
 description: Owns one big, clear, multi-role goal end-to-end — decomposes it, delegates every piece of execution to the right worker (architect-designer to design, developer to build, reviewer to scrutinize, …), verifies each returned goal was achieved, and iterates worker → verify → next until the whole goal is production-quality. A pure orchestrator — no Write/Edit, it authors no code or docs. The main agent spawns one per big goal so it can run several big streams in parallel — small, clear goals still go straight to a single worker.
-tools: Read, Glob, Grep, Bash, Skill, Agent, SendMessage
+tools: Read, Glob, Grep, Bash, Skill, Agent, TaskUpdate, TaskList, TaskGet, SendMessage
 effort: high
 color: purple
 skills: [orchestrating-subagents]

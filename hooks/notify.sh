@@ -11,7 +11,9 @@
 # Override a sound by dropping <toolkit>/sounds/<kind>.<ext> (oga/ogg/wav/mp3);
 # otherwise a distinct freedesktop sound is used, and if none is found, silence.
 #
-# NOTIFY_DRYRUN=1 prints "player|sound" instead of playing — for tests/debugging.
+# NOTIFY_DRYRUN=1 prints "player|sound|xdg_runtime_dir" instead of playing — the
+# resolved environment is reported too, so a test can catch a player that would
+# fail to reach the audio server without making a sound.
 set -uo pipefail
 
 kind="${1:-done}"
@@ -43,8 +45,15 @@ for p in "paplay" "pw-play" "ffplay -nodisp -autoexit -loglevel quiet" "aplay -q
 done
 [ -n "$player" ] || exit 0
 
+# A hook is handed a bare environment, but EVERY player above reaches the audio
+# server through $XDG_RUNTIME_DIR — paplay/pw-play via the PulseAudio/PipeWire
+# socket, aplay/ffplay via ALSA's default PCM routing to that same socket. Absent
+# it they all fail ("Connection refused"), and the redirect below hides it. Only
+# default it; a session that provides one always wins. $EUID keeps this off PATH.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$EUID}"
+
 if [ "${NOTIFY_DRYRUN:-}" = "1" ]; then
-  printf '%s|%s\n' "${player%% *}" "$sound"
+  printf '%s|%s|%s\n' "${player%% *}" "$sound" "$XDG_RUNTIME_DIR"
   exit 0
 fi
 

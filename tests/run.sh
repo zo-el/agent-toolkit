@@ -361,12 +361,14 @@ rm -rf "$fh"
 
 # ── install.sh: the .env merge writes the toolkit env var, keeping yours ──────
 # AGENT_TEAMS=1 is the only env var the toolkit sets. CLAUDE_CODE_ENABLE_TASKS=0
-# was set here briefly and reverted (the task list is gated server-side, so it
-# never brought TodoWrite back), so the merge must also DELETE it from a
-# settings.json a previous install wrote it into — an additive merge would strand
-# the dead key. Same silent single-quoted-jq trap as above, so seed both the
-# retired key and an unrelated one: one assertion then covers the var going
-# missing, the dead flag surviving, and your own key being clobbered.
+# is a real switch — it turns the four Task tools off in favor of the older
+# TodoWrite checklist — set here briefly, then reverted once a server-side flag
+# keyed to the model turned out to be suppressing both families at once. A stale
+# =0 would genuinely disable the Task tools the day that flag lifts, so the merge
+# must DELETE it from a settings.json a previous install wrote it into, not just
+# stop writing it. Same silent single-quoted-jq trap as above, so seed both the
+# stale key and an unrelated one: one assertion then covers the var going
+# missing, the stale switch surviving, and your own key being clobbered.
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
 printf '{"env":{"MY_OWN_VAR":"keep","CLAUDE_CODE_ENABLE_TASKS":"0"}}\n' > "$fh/.claude/settings.json"
 HOME="$fh" "$root/install.sh" >/dev/null 2>&1
@@ -374,7 +376,7 @@ if jq -e '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS == "1"
           and (.env | has("CLAUDE_CODE_ENABLE_TASKS") | not)
           and .env.MY_OWN_VAR == "keep"' \
      "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: AGENT_TEAMS missing (the single-quoted-jq trap), the retired ENABLE_TASKS not cleaned out, or your own .env key clobbered"
+  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: AGENT_TEAMS missing (the single-quoted-jq trap), a stale ENABLE_TASKS=0 not cleaned out, or your own .env key clobbered"
 fi
 rm -rf "$fh"
 
@@ -417,6 +419,54 @@ if cmp -s "$fh/pass1.json" "$fh/.claude/settings.json" \
 fi
 rm -rf "$fh"
 
+# ── install.sh: the settings.json it WRITES carries the toolkit's full wiring ──
+# Every install assertion above reads the TOP of the merge program (.env,
+# .permissions, .enabledPlugins) — which is exactly why they are not enough. A
+# balanced apostrophe PAIR anywhere in that single-quoted jq program truncates it
+# there (bash -n stays happy — see the NB above desired_settings): jq is handed a
+# VALID but partial program, emits a partial config, and install.sh writes it.
+# Put the pair below the lines those assertions read and the statusline plus
+# EVERY guard hook vanish — publish gate, config gate, Linear gate, reaper — with
+# the suite green, the install exiting 0, and the doctor green too (its path
+# check only validates paths it FINDS in settings, so a gutted one gives it
+# nothing to check). Hence this assertion on the TAIL of the program.
+# The event list is derived from the installer SOURCE, never from a run of it:
+# deriving it from the produced settings (or from desired_settings output) would
+# collapse to "whatever landed" and pass vacuously on the very truncation this
+# exists to catch, while a hard-coded list drifts silently the day an event is
+# added. "+ [" is the marker — UserPromptSubmit is only cleaned, never re-added.
+# The two sets must match EXACTLY, which makes the derivation self-checking: a
+# reformat that stops matching an event would otherwise drop it from the
+# requirement unnoticed, and here it fails instead — the event is wired in the
+# settings this just produced but absent from the derived list. HOME is fresh, so
+# every hook in that file is ours; a foreign one could not skew either side.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+want_events="$(grep -oE '\.hooks\.[A-Za-z]+ = clean\([^)]*\) \+ \[' "$root/install.sh" \
+  | grep -oE '\.hooks\.[A-Za-z]+' | cut -d. -f3 | sort -u)"
+missing="$(jq -r --arg want "$want_events" '
+    . as $s
+    | ($want | split("\n") | map(select(length > 0))) as $want_ev
+    | (($s.hooks // {}) | to_entries
+       | map(select((.value | map((.hooks // []) | map(.command // ""))
+                     | flatten | join(" ")) | test("agent-toolkit")))
+       | map(.key)) as $have_ev
+    | [ ((if (($s.statusLine.command // "") | test("agent-toolkit")) then [] else ["statusLine"] end)
+         + (($want_ev - $have_ev) | map("hooks." + .))) | select(length > 0)
+        | "not wired: " + join(", "),
+        (($have_ev - $want_ev) | map("hooks." + .)) | select(length > 0)
+        | "wired but missed by the derivation: " + join(", ") ]
+    | join("; ")' "$fh/.claude/settings.json" 2>/dev/null)" \
+  || missing="<jq could not read the installed settings.json>"
+if [ -z "$want_events" ]; then
+  fail=$((fail + 1)); echo "FAIL install.sh     derived NO wired hook events from install.sh — the derivation is stale, so this assertion proves nothing"
+elif [ -n "$missing" ]; then
+  fail=$((fail + 1)); echo "FAIL install.sh     installed settings.json is missing toolkit wiring: $missing — a truncated merge program writes a valid but gutted config"
+else
+  pass=$((pass + 1))
+fi
+rm -rf "$fh"
+
 # ── notify.sh: host-independent sound/player resolution, fail-safe on no audio ──
 # notify.sh emits (even under NOTIFY_DRYRUN) only when BOTH a sound and a player
 # resolve, and its fallbacks depend on which freedesktop sounds / players a host
@@ -443,13 +493,19 @@ printf '%s\n' "\$@" > "$nb/argv"
 EOF
 chmod +x "$nb/bin/ffplay"
 dry() { PATH="$nb/bin" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" "$@"; }
+# A dry-run line is "player|sound|xdg_runtime_dir", so the sound is the MIDDLE
+# field — strip the leading player AND the trailing runtime dir. Neither a
+# mktemp path nor /run/user/<euid> contains a "|", so the outer fields are
+# unambiguous; parse through these so a future field can't silently shift them.
+sound_of() { local rest="${1#*|}"; printf '%s\n' "${rest%|*}"; }
+xdg_of() { printf '%s\n' "${1##*|}"; }
 
 # (1) alert and done resolve to distinct, KNOWN sounds via the override branch —
 #     same result on any host; and the override is what wins (a fallback would
 #     give a /usr/share/... path, not these).
 al="$(dry alert)"; dn="$(dry done)"
-if [ -n "$al" ] && [ "${al#*|}" = "$tk/sounds/alert.oga" ] \
-   && [ "${dn#*|}" = "$tk/sounds/done.oga" ] && [ "$al" != "$dn" ]; then pass=$((pass + 1)); else
+if [ -n "$al" ] && [ "$(sound_of "$al")" = "$tk/sounds/alert.oga" ] \
+   && [ "$(sound_of "$dn")" = "$tk/sounds/done.oga" ] && [ "$al" != "$dn" ]; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL notify.sh      alert/done must resolve to distinct override sounds (alert=$al done=$dn)"
 fi
 
@@ -469,12 +525,26 @@ fi
 # (4) the multi-word player path: ffplay is selected, word-split into its flags,
 #     with the resolved sound (which contains a space) passed as ONE final arg —
 #     an unquoted "$sound" or a quoted "$player" would change the recorded argv.
-d="$(dry alert)"; snd="${d#*|}"; rm -f "$nb/argv"
+d="$(dry alert)"; snd="$(sound_of "$d")"; rm -f "$nb/argv"
 PATH="$nb/bin" "$tk/hooks/notify.sh" alert
 for i in 1 2 3 4 5; do [ -s "$nb/argv" ] && break; sleep 0.2; done
 printf -- '-nodisp\n-autoexit\n-loglevel\nquiet\n%s\n' "$snd" > "$nb/argv.want"
 if [ "${d%%|*}" = "ffplay" ] && diff -q "$nb/argv" "$nb/argv.want" >/dev/null 2>&1; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL notify.sh      multi-word ffplay must be selected with the sound as one final arg"
+fi
+
+# (5) the bare-environment contract: every case above invokes notify.sh with a
+#     session env it never actually gets as a hook, and that gap is how a mute
+#     notifier shipped — no $XDG_RUNTIME_DIR, so the player fails "Connection
+#     refused" into the /dev/null redirect with no error anywhere. So run it the
+#     way a hook does (env -i, only the minimal PATH above) and assert it
+#     resolves the runtime dir itself, derived independently via id -u — plus
+#     that a session which DOES provide one wins, never clobbered by the default.
+bare="$(env -i PATH="$nb/bin" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert)"
+given="$(env -i PATH="$nb/bin" XDG_RUNTIME_DIR="$nb/session-xdg" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert)"
+if [ "$(xdg_of "$bare")" = "/run/user/$(id -u)" ] \
+   && [ "$(xdg_of "$given")" = "$nb/session-xdg" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      a bare hook env must resolve XDG_RUNTIME_DIR to /run/user/<euid> and a provided one must survive (bare=$bare given=$given)"
 fi
 rm -rf "$nb"
 
