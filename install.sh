@@ -124,10 +124,13 @@ fi
 # and git push would run with no publish gate. A requirement that can shrink by
 # itself is not a requirement.
 # Commands are relative to $STABLE. matcher "" = the event takes no matcher.
-# Notification (a permission/question prompt) and Stop (the main agent
-# finishing) are the "it is your turn" sounds — notify.sh takes the kind as its
-# argument. SubagentStop is deliberately NOT among them: a background agent
-# finishing is not your cue to look, so it only runs the reaper.
+# The "it is your turn" cues — Notification (a permission/question prompt) and
+# Stop (the main agent finishing) — are OWNED by the external
+# claude-notifications-go plugin (its own Notification/Stop hooks), not the
+# toolkit: it reaches you over SSH with a terminal bell and offers click-to-focus,
+# which a local sound cannot. So the toolkit wires NEITHER event. SubagentStop
+# stays here only to run the reaper — a background agent finishing is not your cue
+# to look, and warranted no notification anyway.
 TOOLKIT_WIRING='[
   {"event":"SessionStart","matcher":"startup|resume|clear",
    "hooks":[{"command":"/install.sh --sync"}]},
@@ -143,11 +146,7 @@ TOOLKIT_WIRING='[
   {"event":"SubagentStop","matcher":"",
    "hooks":[{"command":"/hooks/reap-managed.sh"}]},
   {"event":"SessionEnd","matcher":"",
-   "hooks":[{"command":"/hooks/reap-managed.sh"}]},
-  {"event":"Notification","matcher":"",
-   "hooks":[{"command":"/hooks/notify.sh alert"}]},
-  {"event":"Stop","matcher":"",
-   "hooks":[{"command":"/hooks/notify.sh done"}]}
+   "hooks":[{"command":"/hooks/reap-managed.sh"}]}
 ]'
 
 desired_settings() {
@@ -264,10 +263,17 @@ desired_settings() {
     # gate at all. (Takes effect once the plugin is installed/cached; if it is not,
     # the user runs: /plugin install pr-review-toolkit@claude-plugins-official)
     | .enabledPlugins["pr-review-toolkit@claude-plugins-official"] = true
-    # Superseded by hooks/notify.sh — disable the external notifications plugin
-    # so a sound is not played twice (no-op if it was never installed).
-    | (if (.enabledPlugins // {} | has("claude-notifications-go@claude-notifications-go"))
-       then .enabledPlugins["claude-notifications-go@claude-notifications-go"] = false else . end)
+    # Revert: the toolkit used to DISABLE this plugin (it once shipped
+    # its own sound hook in its place). The plugin is richer — an SSH-reachable
+    # terminal bell, click-to-focus, webhooks — and now OWNS the Notification/Stop
+    # cues, so the toolkit neither ships that hook nor disables the plugin. A prior
+    # install may have written =false here; DELETE that stale entry (rather than
+    # merely ceasing to write it — the CLAUDE_CODE_ENABLE_TASKS reasoning above) so
+    # the key goes back to being managed by the plugin install flow. Guarded on
+    # ==false: a =true means the plugin is enabled and must never be deleted, and an
+    # absent key is left absent (no-op when the plugin was never installed).
+    | (if ((.enabledPlugins // {})["claude-notifications-go@claude-notifications-go"]) == false
+       then .enabledPlugins |= del(.["claude-notifications-go@claude-notifications-go"]) else . end)
     | .statusLine = {type: "command", command: ($base + "/hooks/statusline.py"), padding: 0}
     # Hooks are BUILT from $wiring — the declaration above this function, which
     # is also what the doctor requires — rather than written out event by event
@@ -452,24 +458,6 @@ if [ "$MODE" != "--dry-run" ] && command -v jq >/dev/null 2>&1; then
         "$CLAUDE_DIR/plugins/installed_plugins.json" >/dev/null 2>&1; then
     echo "agent-toolkit doctor: ! plugin $plugin_key is enabled but not installed — the review gate the agents spawn has nothing to run. Install once: claude plugin install $plugin_key --scope user (see README)"
   fi
-fi
-# Notification sounds are best-effort — a missing player degrades to silence,
-# not a failed install; just tell the user so it isn't a silent surprise. This
-# mirrors notify.sh's player resolution, not merely "is any player on PATH":
-# paplay/pw-play/ffplay decode the .oga freedesktop fallbacks, but aplay speaks
-# only WAV, so on an aplay-ONLY host the default .oga sounds play NOTHING — and
-# the toolkit ships no .wav overrides by default. So aplay alone counts as wired
-# only when sounds/alert.wav AND sounds/done.wav overrides exist (the coarse
-# "will anything play?" call — notify.sh owns the exact per-sound format logic).
-if command -v paplay >/dev/null 2>&1 || command -v pw-play >/dev/null 2>&1 \
-   || command -v ffplay >/dev/null 2>&1; then
-  :   # a richer player is present — it decodes the .oga freedesktop fallbacks
-elif command -v aplay >/dev/null 2>&1; then
-  if [ ! -f "$ROOT/sounds/alert.wav" ] || [ ! -f "$ROOT/sounds/done.wav" ]; then
-    say "  ! only aplay is installed, which can't decode the default .oga notification sounds — notifications will be silent until a richer player (paplay/pw-play/ffplay) is installed or sounds/alert.wav + sounds/done.wav overrides are added"
-  fi
-else
-  say "  ! no audio player (paplay/pw-play/ffplay/aplay) — notification sounds will be silent"
 fi
 
 # Stamp the installed version — the statusline shows it (v<count>·<sha>) and

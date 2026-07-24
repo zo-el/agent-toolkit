@@ -97,13 +97,12 @@ The version segment (`⬡ v<count>·<sha>`) is your "are my changes applied?" li
 
 ## Notifications
 
-[`hooks/notify.sh`](hooks/notify.sh) plays a sound **only when it's your turn** — so you can keep your eyes off the screen until you're actually needed:
+Notifications are owned by the external **[`claude-notifications-go`](https://github.com/777genius/claude-notifications-go)** plugin, not the toolkit — it does what a local sound alone cannot: a **terminal bell** to `/dev/tty` that reaches you over SSH, **click-to-focus** (jump to the exact project window and tab), and optional **webhooks** (Slack, Discord, ntfy, …). It fires on the same "only when it's your turn" cues, and its `suppressForSubagents` default keeps subagent/background completions silent, so a background agent finishing is never a false cue:
 
-- **`Notification` → `alert`** (a distinct, attention-grabbing sound): Claude needs a permission or is asking a question.
-- **`Stop` → `done`** (a softer completion sound): the main agent finished its turn and the reply is ready.
-- **`SubagentStop` is deliberately *not* wired** — a background agent finishing is not your cue to look, so it stays silent.
+- **`Notification`** — Claude needs a permission or is asking a question.
+- **`Stop`** — the main agent finished its turn and the reply is ready.
 
-The kind is passed as an argument (`notify.sh alert` / `notify.sh done`), so the hook never misreads a payload. It's cheap (a detached `paplay`/`pw-play`/`ffplay`/`aplay` of a ~20 KB sound) and fail-safe — no player or no sound file degrades to silence, never to an error. Override either cue by dropping `sounds/<kind>.<ext>` (oga/ogg/wav/mp3) in the toolkit; otherwise a distinct [freedesktop](https://www.freedesktop.org/wiki/Specifications/sound-theme-spec/) sound is used. `install.sh` wires these two events and disables the external `claude-notifications-go` plugin it replaces (so nothing plays twice).
+`install.sh` does **not** wire any notification hook, and no longer disables the plugin (an earlier toolkit version did, to avoid double-firing its own now-retired sound hook; a re-install now clears that stale disable so the plugin's own `Notification`/`Stop`/`SubagentStop` hooks run). Install the plugin once via its [README](https://github.com/777genius/claude-notifications-go#installation) — it downloads a prebuilt binary, no Go toolchain needed — then `/claude-notifications-go:settings` configures per-status sounds, volume, focus-aware delivery and webhooks in `~/.claude/claude-notifications-go/config.json`.
 
 ## Layout & lifecycle
 

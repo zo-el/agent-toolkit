@@ -167,8 +167,8 @@ gc_case() { # $1 expected, $2 file_path, $3 cwd, $4 label
 gc_case allow "$fh/.claude/agent-toolkit/core.md"            "/proj"        "core.md, cwd OUTSIDE → allow (workspace; not cwd-gated)"
 gc_case allow "$fh/.claude/agent-toolkit/core.md"            "$tkco"        "core.md, cwd INSIDE → allow (workspace)"
 gc_case allow "$fh/.claude/agent-toolkit/skills/s/SKILL.md"  ""             "skills file, cwd ABSENT (subagent) → allow (the misfire we removed)"
-gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "$tkco"        "hooks file, cwd INSIDE → ask (enforcement layer)"
-gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "/proj"        "hooks file, cwd OUTSIDE → ask (enforcement layer)"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/guard-git.sh" "$tkco"        "hooks file, cwd INSIDE → ask (enforcement layer)"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/guard-git.sh" "/proj"        "hooks file, cwd OUTSIDE → ask (enforcement layer)"
 gc_case ask   "$fh/.claude/agent-toolkit/hooks/guard-git.sh" ""             "hooks file, cwd ABSENT (subagent) → ask (deterministic)"
 gc_case allow "/proj/src/main.rs"                            "/proj"        "a normal repo write elsewhere → unaffected"
 rm -rf "$fh" "$tkco"
@@ -417,6 +417,38 @@ if jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true
 fi
 rm -rf "$fh"
 
+# ── install.sh: the REVERT — it no longer DISABLES claude-notifications-go, and ──
+# ── clears a stale =false a prior toolkit install wrote (that plugin now owns the ──
+# ── notifications). A =true (plugin enabled by its own install) is never touched; ──
+# ── an absent key stays absent, so a fresh install never disables the plugin. ────
+cng="claude-notifications-go@claude-notifications-go"
+# (a) a stale =false a prior toolkit install left must be DELETED, siblings kept.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"enabledPlugins":{"%s":false,"other-plugin@vendor":true}}\n' "$cng" > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if jq -e --arg k "$cng" '(.enabledPlugins | has($k) | not)
+      and .enabledPlugins["other-plugin@vendor"] == true
+      and .enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true' \
+     "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     a stale claude-notifications-go=false must be DELETED on install (the revert), keeping siblings"
+fi
+rm -rf "$fh"
+# (b) the plugin enabled (=true) by its own install must be left enabled, never clobbered.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"enabledPlugins":{"%s":true}}\n' "$cng" > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if jq -e --arg k "$cng" '.enabledPlugins[$k] == true' "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     an enabled claude-notifications-go=true must be left untouched (never re-disabled or deleted)"
+fi
+rm -rf "$fh"
+# (c) a fresh install must NOT add the key at all — the old behavior wrote =false here.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if jq -e --arg k "$cng" '(.enabledPlugins | has($k)) | not' "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     a fresh install must NOT add claude-notifications-go (it must not disable the plugin)"
+fi
+rm -rf "$fh"
+
 # ── install.sh: the .env merge writes the toolkit env vars, keeping yours ─────
 # Two vars are set. AGENT_TEAMS=1 turns on named teammates and SendMessage.
 # MAX_SUBAGENT_SPAWN_DEPTH=3 restores the two-level DELEGATION model every agent
@@ -571,8 +603,7 @@ rm -rf "$fh"
 # again, when the matcher is dropped so a guard fires on every tool, and when
 # guard-git.sh and guard-config.sh swap places between two PreToolUse entries —
 # the publish gate is gone in all three, with install exiting 0 and the doctor
-# green. It also could not tell notify.sh done wired to Notification from the
-# right way round.
+# green.
 # The table below is written out here rather than derived from install.sh —
 # derived (from its source text, from its output, either way), it would move
 # WITH any mutation of the installer and assert nothing. The installer's own
@@ -599,9 +630,7 @@ want_wiring="$(jq -Scn --arg b "$b" '[
   {event:"PostToolUse",  matcher:"Write|Edit",           command:($b+"/hooks/sync-on-skill-edit.sh"), async:false},
   {event:"PostToolUse",  matcher:"Write|Edit",           command:($b+"/hooks/format-on-edit.sh"),  async:true},
   {event:"SubagentStop", matcher:"",                     command:($b+"/hooks/reap-managed.sh"),    async:false},
-  {event:"SessionEnd",   matcher:"",                     command:($b+"/hooks/reap-managed.sh"),    async:false},
-  {event:"Notification", matcher:"",                     command:($b+"/hooks/notify.sh alert"),    async:false},
-  {event:"Stop",         matcher:"",                     command:($b+"/hooks/notify.sh done"),     async:false}
+  {event:"SessionEnd",   matcher:"",                     command:($b+"/hooks/reap-managed.sh"),    async:false}
 ] | sort')"
 sl_cmd="$(jq -r '.statusLine.command // ""' "$fh/.claude/settings.json" 2>/dev/null)"
 if [ "$got_wiring" = "$want_wiring" ] && [ "$sl_cmd" = "$b/hooks/statusline.py" ]; then
@@ -749,150 +778,6 @@ if jq -e --arg a "$A" --arg b "$B" '
   fail=$((fail + 1)); echo "FAIL install.sh     a moved checkout must drop its old additionalDirectories entry, keep the new one and user-added dirs"
 fi
 rm -rf "$fh"
-
-# ── notify.sh: host-independent sound/player resolution, fail-safe on no audio ──
-# notify.sh emits (even under NOTIFY_DRYRUN) only when BOTH a sound and a player
-# resolve, and its fallbacks depend on which freedesktop sounds / players a host
-# ships. Asserting real output would false-fail on a headless box (no player) or
-# one carrying only bell.oga (alert and done both fall through to bell). So we
-# prove the RESOLUTION LOGIC against a self-contained toolkit root (known,
-# distinct override sounds) with a minimal PATH holding a FAKE player —
-# deterministic on any host — and prove the no-player path is silent success.
-nb="$(mktemp -d)"; tk="$nb/tk root"        # a space in the root proves single-arg
-mkdir -p "$nb/bin" "$nb/noaudio" "$tk/hooks" "$tk/sounds"
-cp "$root/hooks/notify.sh" "$tk/hooks/notify.sh"
-: > "$tk/sounds/alert.oga"; : > "$tk/sounds/done.oga"
-# Minimal PATHs: only the interpreter + externals notify.sh needs. $nb/bin also
-# carries a fake player; $nb/noaudio carries none (the headless-box case).
-for b in bash dirname setsid; do
-  bp="$(command -v "$b" 2>/dev/null)" && { ln -s "$bp" "$nb/bin/$b"; ln -s "$bp" "$nb/noaudio/$b"; }
-done
-# No real paplay/pw-play/aplay on this PATH, so the multi-word "ffplay …"
-# candidate is the one that resolves; it records its argv so we can prove the
-# flags word-split and the sound is passed as ONE final argument.
-cat > "$nb/bin/ffplay" <<EOF
-#!/bin/sh
-printf '%s\n' "\$@" > "$nb/argv"
-EOF
-chmod +x "$nb/bin/ffplay"
-dry() { PATH="$nb/bin" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" "$@"; }
-# A dry-run line is "player|sound|xdg_runtime_dir", so the sound is the MIDDLE
-# field — strip the leading player AND the trailing runtime dir. Neither a
-# mktemp path nor /run/user/<euid> contains a "|", so the outer fields are
-# unambiguous; parse through these so a future field can't silently shift them.
-sound_of() { local rest="${1#*|}"; printf '%s\n' "${rest%|*}"; }
-xdg_of() { printf '%s\n' "${1##*|}"; }
-
-# (1) alert and done resolve to distinct, KNOWN sounds via the override branch —
-#     same result on any host; and the override is what wins (a fallback would
-#     give a /usr/share/... path, not these).
-al="$(dry alert)"; dn="$(dry done)"
-if [ -n "$al" ] && [ "$(sound_of "$al")" = "$tk/sounds/alert.oga" ] \
-   && [ "$(sound_of "$dn")" = "$tk/sounds/done.oga" ] && [ "$al" != "$dn" ]; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      alert/done must resolve to distinct override sounds (alert=$al done=$dn)"
-fi
-
-# (2) unknown kind → silent and still exit 0 (never guesses a sound).
-if [ -z "$(dry bogus)" ] && dry bogus >/dev/null 2>&1; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      unknown kind must be silent and still exit 0"
-fi
-
-# (3) fail-safe: with NO player on PATH, notify.sh is silent and exits 0 — the
-#     headless-box contract that keeps this portable gate green with no audio.
-if [ -z "$(PATH="$nb/noaudio" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert)" ] \
-   && PATH="$nb/noaudio" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert >/dev/null 2>&1; then
-  pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      no audio player must degrade to silent success"
-fi
-
-# (4) the multi-word player path: ffplay is selected, word-split into its flags,
-#     with the resolved sound (which contains a space) passed as ONE final arg —
-#     an unquoted "$sound" or a quoted "$player" would change the recorded argv.
-d="$(dry alert)"; snd="$(sound_of "$d")"; rm -f "$nb/argv"
-PATH="$nb/bin" "$tk/hooks/notify.sh" alert
-for i in 1 2 3 4 5; do [ -s "$nb/argv" ] && break; sleep 0.2; done
-printf -- '-nodisp\n-autoexit\n-loglevel\nquiet\n%s\n' "$snd" > "$nb/argv.want"
-if [ "${d%%|*}" = "ffplay" ] && diff -q "$nb/argv" "$nb/argv.want" >/dev/null 2>&1; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      multi-word ffplay must be selected with the sound as one final arg"
-fi
-
-# (5) the bare-environment contract: every case above invokes notify.sh with a
-#     session env it never actually gets as a hook, and that gap is how a mute
-#     notifier shipped — no $XDG_RUNTIME_DIR, so the player fails "Connection
-#     refused" into the /dev/null redirect with no error anywhere. So run it the
-#     way a hook does (env -i, only the minimal PATH above) and assert it
-#     resolves the runtime dir itself, derived independently via id -u — plus
-#     that a session which DOES provide one wins, never clobbered by the default.
-bare="$(env -i PATH="$nb/bin" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert)"
-given="$(env -i PATH="$nb/bin" XDG_RUNTIME_DIR="$nb/session-xdg" NOTIFY_DRYRUN=1 "$tk/hooks/notify.sh" alert)"
-if [ "$(xdg_of "$bare")" = "/run/user/$(id -u)" ] \
-   && [ "$(xdg_of "$given")" = "$nb/session-xdg" ]; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      a bare hook env must resolve XDG_RUNTIME_DIR to /run/user/<euid> and a provided one must survive (bare=$bare given=$given)"
-fi
-
-# (6) aplay decodes only WAV — never Ogg. On an alsa-only host (aplay the SOLE
-#     player) a .oga sound must fall through to silent success: choosing aplay
-#     there errors into the /dev/null redirect below — the exact mute-notifier
-#     regression, invisible while the doctor still sees a player on PATH. Yet a
-#     .wav sound on that same host MUST still resolve to aplay (it can decode
-#     WAV). A toolkit root with alert=.oga and done=.wav proves both directions,
-#     so neither "always skip aplay" nor "always accept aplay" can pass.
-ak="$nb/alsa-tk"; mkdir -p "$ak/hooks" "$ak/sounds" "$nb/alsa"
-cp "$root/hooks/notify.sh" "$ak/hooks/notify.sh"
-: > "$ak/sounds/alert.oga"; : > "$ak/sounds/done.wav"
-for b in bash dirname setsid; do
-  bp="$(command -v "$b" 2>/dev/null)" && ln -s "$bp" "$nb/alsa/$b"
-done
-printf '#!/bin/sh\nexit 0\n' > "$nb/alsa/aplay"; chmod +x "$nb/alsa/aplay"
-oga_line="$(PATH="$nb/alsa" NOTIFY_DRYRUN=1 "$ak/hooks/notify.sh" alert)"
-wav_line="$(PATH="$nb/alsa" NOTIFY_DRYRUN=1 "$ak/hooks/notify.sh" done)"
-if [ -z "$oga_line" ] && PATH="$nb/alsa" NOTIFY_DRYRUN=1 "$ak/hooks/notify.sh" alert >/dev/null 2>&1 \
-   && [ "${wav_line%%|*}" = "aplay" ] && [ "$(sound_of "$wav_line")" = "$ak/sounds/done.wav" ]; then
-  pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL notify.sh      aplay must be skipped for .oga (silent) yet chosen for .wav (oga=$oga_line wav=$wav_line)"
-fi
-rm -rf "$nb"
-
-# ── install.sh: the doctor's sound check matches notify.sh's aplay-can't-Ogg rule ─
-# notify.sh case 6 above proves the RUNTIME skips aplay for the .oga freedesktop
-# fallbacks (aplay decodes only WAV); this proves the DOCTOR now agrees. An
-# aplay-ONLY host with the default .oga sounds plays NOTHING, yet the old doctor
-# warned only when ALL of paplay/pw-play/ffplay/aplay were absent — so it stayed
-# silent and reported sound wired: the same doctor-vs-reality blind spot, one
-# layer up. The doctor now mirrors notify.sh's coarse decision — aplay alone is
-# enough only if the toolkit ships .wav overrides for BOTH notify kinds. Drive the
-# REAL doctor with a PATH whose only audio player is a fake aplay: the host's real
-# players are masked by mirroring $PATH minus the four, so this is hermetic even
-# here where all four are installed. A fixture checkout whose sounds/ we control
-# gives the with/without-.wav states without touching the real repo; a fake ffplay
-# added last is the richer-player case. Three states, one fixture: aplay+no-wav
-# warns, aplay+both-wav silent, ffplay silent — so neither "aplay always counts"
-# (the bug) nor "aplay never counts" can pass.
-sc="$(mktemp -d)"; scbin="$sc/bin"; mkdir -p "$scbin"
-IFS=: read -ra scpath <<< "$PATH"
-for d in "${scpath[@]}"; do
-  [ -d "$d" ] || continue
-  ln -s "$d"/* "$scbin/" 2>/dev/null || true   # first-wins union of the real PATH
-done
-# Drop the four audio players (and any literal-'*' link an empty PATH dir left),
-# so command -v finds exactly the fake players we inject below and nothing else.
-rm -f "$scbin/paplay" "$scbin/pw-play" "$scbin/ffplay" "$scbin/aplay" "$scbin/*"
-printf '#!/bin/sh\nexit 0\n' > "$scbin/aplay"; chmod +x "$scbin/aplay"   # command -v only checks it exists+x
-sctk="$sc/tk"; mkdir -p "$sctk"
-for p in install.sh install-skills.sh core.md CLAUDE.md hooks agents skills; do cp -a "$root/$p" "$sctk/"; done
-sc_run() { rm -rf "$sc/home"; mkdir -p "$sc/home/.claude"; PATH="$scbin" HOME="$sc/home" "$sctk/install.sh" 2>&1; }
-sc_warns() { case "$1" in *"only aplay is installed"*) return 0 ;; *) return 1 ;; esac; }
-out_nowav="$(sc_run)"
-mkdir -p "$sctk/sounds"; : > "$sctk/sounds/alert.wav"; : > "$sctk/sounds/done.wav"
-out_wav="$(sc_run)"
-printf '#!/bin/sh\nexit 0\n' > "$scbin/ffplay"; chmod +x "$scbin/ffplay"
-out_ffplay="$(sc_run)"
-if sc_warns "$out_nowav" && ! sc_warns "$out_wav" && ! sc_warns "$out_ffplay"; then
-  pass=$((pass + 1)); else
-  fail=$((fail + 1))
-  echo "FAIL install.sh     doctor sound check: aplay-only+no-wav must warn, but .wav overrides or a richer player must stay silent"
-fi
-rm -rf "$sc"
 
 # ── statusline: toolkit version segment shows the version, ⚠ only when stale ──
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"; ln -s "$root" "$fh/.claude/agent-toolkit"
