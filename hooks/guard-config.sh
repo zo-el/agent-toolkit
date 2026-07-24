@@ -29,29 +29,24 @@ ask() {
   exit 0
 }
 
-# The toolkit checkout is a repo workspace, but two kinds of write into it must
-# be SEEN, not slipped into a session:
-#   • hooks/ ARE the enforcement layer — always ask, even from inside the toolkit
-#     (a silent hook edit could disable the guard). Unchanged.
-#   • every other instruction-surface file (agents/*, core.md, skills/**,
-#     install.sh) the future sessions load: free to edit FROM INSIDE the toolkit
-#     (that is the current workspace — prompting there re-adds the friction the
-#     working-directory approval removed), but a write reaching in from a session
-#     whose cwd is OUTSIDE the checkout is the case that approval newly exposed —
-#     ask there. cwd (a PreToolUse payload field) is realpath-resolved like the
-#     target, so a symlink can't dodge the gate on either side.
+# The toolkit checkout is a repo workspace (an additionalDirectory), so its files
+# are freely writable from any session — the working-directory approval covers
+# them, subagents included. The ONE exception is hooks/: they ARE the enforcement
+# layer, so a hook edit must be SEEN, not slipped into a session — always ask (a
+# silent hook edit could disable the guard).
+#
+# We deliberately do NOT gate the other instruction-surface files (agents/*,
+# core.md, skills/**, install.sh) on the payload cwd. A subagent's cwd is not
+# reliably the checkout — sometimes it is the scratchpad or empty — so a cwd-keyed
+# gate fired an un-suppressible ask on legitimate in-session writes: a hook runs
+# BEFORE permission rules, so even "allow for the entire session" could not clear
+# it, and the same agent kept re-asking. The publish gate is the backstop instead:
+# nothing leaves the machine unreviewed.
 toolkit="$(readlink -f "$HOME/.claude/agent-toolkit" 2>/dev/null || true)"
 if [ -n "$toolkit" ]; then
   case "$rp" in
     "$toolkit"/hooks/*)
       ask "Guardrail edit: $fp changes the enforcement hooks themselves — review before it takes effect." ;;
-    "$toolkit"/*)
-      cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
-      cwd_rp="$(realpath -m -- "$cwd" 2>/dev/null || printf '%s' "$cwd")"
-      case "$cwd_rp" in
-        "$toolkit"|"$toolkit"/*) exit 0 ;;   # toolkit edited from inside itself: free
-        *) ask "Device-config gate (core.md): $fp is in the toolkit checkout but this session's cwd is outside it — review before it takes effect." ;;
-      esac ;;
   esac
 fi
 

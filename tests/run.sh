@@ -138,15 +138,18 @@ file_case allow "$HOME/.claude/backups/settings.json.bak"
 file_case allow "/proj/src/main.rs"
 file_case allow "/tmp/scratch/notes.md"
 
-# ── guard-config: the toolkit checkout is free from INSIDE it, gated from OUTSIDE ─
-# The working-directory approval made the whole checkout auto-writable, so without
-# this gate agents/*, core.md, skills/**, install.sh — the instruction surface
-# every future session loads — could be rewritten with NO prompt from an unrelated
-# repo. Driven under a FIXTURE HOME with a symlinked checkout (never the real
-# ~/.claude) and cwd carried in the payload the way Claude Code sends it; the
-# target is reached THROUGH the ~/.claude symlink, so only realpath matching
-# catches it. Four directions, so a fix that drops the gate (outside→allow) and one
-# that over-gates (inside→ask) both fail, and the hooks/* gate stays put.
+# ── guard-config: the toolkit checkout is a free workspace; only hooks/ is gated ─
+# The working-directory approval makes the whole checkout auto-writable — that is
+# intended: it is the workspace. Its files (agents/*, core.md, skills/**,
+# install.sh) must stay writable regardless of the payload cwd, because a
+# subagent's cwd is not reliably the checkout (often the scratchpad or empty); an
+# earlier cwd-keyed gate fired an un-suppressible ask on those legitimate writes.
+# So the ONLY thing this hook asks on is hooks/* — the enforcement layer — and it
+# asks there deterministically, cwd or no cwd. The cwd-ABSENT case is the exact
+# subagent misfire we removed, so it is asserted here: a re-added cwd gate would
+# fail it. Driven under a FIXTURE HOME with a symlinked checkout (never the real
+# ~/.claude); the target is reached THROUGH the ~/.claude symlink, so only
+# realpath matching catches it.
 fh="$(cd "$(mktemp -d)" && pwd -P)"; mkdir -p "$fh/.claude"
 tkco="$(cd "$(mktemp -d)" && pwd -P)"; mkdir -p "$tkco/hooks" "$tkco/agents"
 ln -s "$tkco" "$fh/.claude/agent-toolkit"
@@ -161,12 +164,12 @@ gc_case() { # $1 expected, $2 file_path, $3 cwd, $4 label
     fail=$((fail + 1)); printf 'FAIL %-14s want=%-5s got=%-5s  %s\n' guard-config.sh "$1" "$got" "$4"
   fi
 }
-gc_case ask   "$fh/.claude/agent-toolkit/core.md"            "/proj"        "core.md, cwd OUTSIDE → ask (the newly-exposed case)"
-gc_case allow "$fh/.claude/agent-toolkit/core.md"            "$tkco"        "core.md, cwd INSIDE (root) → allow (the workspace)"
-gc_case allow "$fh/.claude/agent-toolkit/skills/s/SKILL.md"  "$tkco/agents" "skills file, cwd deep INSIDE → allow"
-gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "$tkco"        "hooks file, cwd INSIDE → still ask (unchanged)"
-gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "/proj"        "hooks file, cwd OUTSIDE → ask (unchanged)"
-gc_case ask   "$fh/.claude/agent-toolkit/install.sh"         ""             "install.sh, cwd absent → ask (fail-safe: can't confirm inside)"
+gc_case allow "$fh/.claude/agent-toolkit/core.md"            "/proj"        "core.md, cwd OUTSIDE → allow (workspace; not cwd-gated)"
+gc_case allow "$fh/.claude/agent-toolkit/core.md"            "$tkco"        "core.md, cwd INSIDE → allow (workspace)"
+gc_case allow "$fh/.claude/agent-toolkit/skills/s/SKILL.md"  ""             "skills file, cwd ABSENT (subagent) → allow (the misfire we removed)"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "$tkco"        "hooks file, cwd INSIDE → ask (enforcement layer)"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "/proj"        "hooks file, cwd OUTSIDE → ask (enforcement layer)"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/guard-git.sh" ""             "hooks file, cwd ABSENT (subagent) → ask (deterministic)"
 gc_case allow "/proj/src/main.rs"                            "/proj"        "a normal repo write elsewhere → unaffected"
 rm -rf "$fh" "$tkco"
 
