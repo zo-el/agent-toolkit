@@ -29,12 +29,29 @@ ask() {
   exit 0
 }
 
-# The toolkit's hooks are the guardrail implementation — edits are legitimate
-# (it's a repo) but must be seen, not slipped into a session.
+# The toolkit checkout is a repo workspace, but two kinds of write into it must
+# be SEEN, not slipped into a session:
+#   • hooks/ ARE the enforcement layer — always ask, even from inside the toolkit
+#     (a silent hook edit could disable the guard). Unchanged.
+#   • every other instruction-surface file (agents/*, core.md, skills/**,
+#     install.sh) the future sessions load: free to edit FROM INSIDE the toolkit
+#     (that is the current workspace — prompting there re-adds the friction the
+#     working-directory approval removed), but a write reaching in from a session
+#     whose cwd is OUTSIDE the checkout is the case that approval newly exposed —
+#     ask there. cwd (a PreToolUse payload field) is realpath-resolved like the
+#     target, so a symlink can't dodge the gate on either side.
 toolkit="$(readlink -f "$HOME/.claude/agent-toolkit" 2>/dev/null || true)"
 if [ -n "$toolkit" ]; then
   case "$rp" in
-    "$toolkit"/hooks/*) ask "Guardrail edit: $fp changes the enforcement hooks themselves — review before it takes effect." ;;
+    "$toolkit"/hooks/*)
+      ask "Guardrail edit: $fp changes the enforcement hooks themselves — review before it takes effect." ;;
+    "$toolkit"/*)
+      cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
+      cwd_rp="$(realpath -m -- "$cwd" 2>/dev/null || printf '%s' "$cwd")"
+      case "$cwd_rp" in
+        "$toolkit"|"$toolkit"/*) exit 0 ;;   # toolkit edited from inside itself: free
+        *) ask "Device-config gate (core.md): $fp is in the toolkit checkout but this session's cwd is outside it — review before it takes effect." ;;
+      esac ;;
   esac
 fi
 

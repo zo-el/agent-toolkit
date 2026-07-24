@@ -224,7 +224,13 @@ def segment_toolkit():
         return None
     if not label:
         return None
-    stale = ""
+    # Freshness must fail SAFE. This light exists to catch commit-then-forgot-to-
+    # reinstall, so an unverifiable check — git times out on a cold cache / loaded
+    # box, errors, or returns nothing — must NOT render the confident clean stamp:
+    # that asserts "your changes are applied" precisely when they may not be. Only
+    # a positively-verified match earns no marker; every other outcome shows a dim
+    # `?` (mirroring segment_git's `?` on a git timeout).
+    marker = f"{DIM}?{RESET}"
     m = re.search(r"·([0-9a-f]+)", label)
     if m:
         try:
@@ -233,11 +239,14 @@ def segment_toolkit():
                  "rev-parse", "--short", "HEAD"],
                 capture_output=True, text=True, timeout=0.2,
             ).stdout.strip()
-            if cur and cur != m.group(1):
-                stale = f"{COLORS['yellow']}⚠{RESET}"
+            if cur == m.group(1):
+                marker = ""                             # verified fresh → clean stamp
+            elif cur:
+                marker = f"{COLORS['yellow']}⚠{RESET}"   # verified moved past → stale
+            # cur empty (git ran, gave nothing) → keep `?`: freshness undetermined
         except Exception:
-            pass
-    return f"{DIM}⬡ {label}{RESET}{stale}"
+            pass                                        # timeout/error → keep `?`
+    return f"{DIM}⬡ {label}{RESET}{marker}"
 
 
 def main():

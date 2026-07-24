@@ -90,9 +90,38 @@ fi
 
 # Shell writes into ~/.claude (device config) — memory (projects/), backups/,
 # and the agent-toolkit symlink (a repo workspace in disguise) stay open.
-if hit "(~|\\\$HOME|$HOME)/\\.claude/" && ! hit '\.claude/(projects|backups|agent-toolkit)/'; then
-  hit '(>>?|\btee\b|\bsed\b[^|;&]*[[:space:]]-i|\bcp\b|\bmv\b|\bln\b|\brsync\b|\btruncate\b|\bchmod\b|\bchown\b)' \
-    && verdict ask "State-mutation gate (core.md): shell write into ~/.claude device config — needs per-action approval."
+#
+# The exemption is decided per PATH, never over the command as a whole. Judged
+# whole-command, a read of ANY exempt path launders a gated write standing next
+# to it: `cat ~/.claude/agent-toolkit/README.md && echo x > ~/.claude/settings.json`
+# went straight through, and the working directories now approved for ~/.claude
+# mean no permission prompt is left behind it. So every home-anchored ~/.claude
+# path in the command must itself be exempt for the write to pass.
+# No shell parsing is attempted: one write verb anywhere plus one gated path
+# anywhere is an ask. That over-asks on a read beside an unrelated write
+# (`jq . ~/.claude/settings.json > /tmp/x` — which already asked), and it is the
+# side to err on; splitting into commands would hand back the laundering the
+# moment a separator appeared inside a quoted argument.
+if hit '(>>?|\btee\b|\bsed\b[^|;&]*[[:space:]]-i|\bcp\b|\bmv\b|\bln\b|\brsync\b|\btruncate\b|\bchmod\b|\bchown\b)'; then
+  # ~, $HOME, ${HOME} and the expanded value are how home gets written. The
+  # trailing slash is optional on BOTH patterns, so `cd ~/.claude && echo x >
+  # settings.json` is judged while ~/.claude/agent-toolkit itself stays open.
+  home_re='(~|\$HOME|\$\{HOME\}|'"$HOME"')/\.claude'
+  gated_re="$home_re(/|\$)"
+  exempt_re="$home_re/(projects|backups|agent-toolkit)(/|\$)"
+  # Redirects and separators are split off before tokenizing so a target glued
+  # to an exempt path (`~/.claude/agent-toolkit/x>~/.claude/settings.json`) is
+  # still judged alone, and quotes are dropped the way the shell drops them
+  # ("$HOME"/.claude/…). Globbing off: a token here is text, not a pattern.
+  set -f
+  for tok in $(printf '%s' "$cmd" | sed 's/[<>|;&]/ & /g'); do
+    tok="${tok//\"/}"; tok="${tok//\'/}"
+    [[ $tok =~ $gated_re ]] || continue
+    [[ $tok =~ $exempt_re ]] && continue
+    set +f
+    verdict ask "State-mutation gate (core.md): shell write into ~/.claude device config ($tok) — needs per-action approval."
+  done
+  set +f
 fi
 
 exit 0

@@ -1,0 +1,3 @@
+# statusline.py is executed by the hook runner, which caches bytecode next to it.
+__pycache__/
+*.pyc

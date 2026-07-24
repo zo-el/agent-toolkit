@@ -1,7 +1,7 @@
 ---
 name: project-manager
 description: Tracks and organizes the work the architect created — mirrors the task catalog to Linear, keeps the board and backlog honest, sequences and surfaces the right next thing, tracks maintenance chores, and scaffolds a new repo's contract. The only agent that writes Linear. Does not create feature tasks or build them. The orchestrator spawns it to sync the board, audit drift, answer "what's next", run a chore, or bootstrap a project.
-tools: Read, Glob, Grep, Bash, Edit, Write, Skill, mcp__linear, TaskUpdate, TaskList, TaskGet, SendMessage
+tools: Read, Glob, Grep, Bash, Edit, Write, Skill, mcp__linear, TaskUpdate, TaskList, TaskGet, TaskStop, SendMessage, ToolSearch
 effort: max
 color: yellow
 skills: [linear-sync, next-up, backlog, chore, project-bootstrap]

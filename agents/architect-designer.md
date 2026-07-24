@@ -1,7 +1,7 @@
 ---
 name: architect-designer
 description: Holds the shape of a thing before it exists — designs the spec/contract (interfaces, invariants, failure modes, the UX journey) and breaks it into the task catalog with acceptance criteria, owning that everything is covered. Writes docs and tasks, never application source. The orchestrator spawns it for new or revised functionality, before any planning or code.
-tools: Read, Write, Edit, Glob, Grep, Bash, Skill, Agent, TaskUpdate, TaskList, TaskGet, SendMessage
+tools: Read, Write, Edit, Glob, Grep, Bash, Skill, Agent, TaskUpdate, TaskList, TaskGet, TaskStop, SendMessage, ToolSearch
 effort: max
 color: blue
 skills: [feature-spec, feature-tasks, skill-authoring]

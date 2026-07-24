@@ -102,6 +102,29 @@ bash_case allow 'echo note > ~/.claude/projects/p/memory/note.md'
 bash_case allow 'systemctl status myservice'
 bash_case allow 'git commit-graph write'
 
+# ── guard-git: the ~/.claude exemption is per PATH, never command-wide ──
+# Judged over the whole command, a read of ANY exempt path laundered a gated
+# write standing beside it — the write went through with no prompt behind it,
+# since ~/.claude is now an approved working directory. Each separator gets its
+# own case: they are what a command is split on, so a fix that only handled &&
+# would leave the others open. The last four are the same laundering by other
+# spellings of home, by gluing the target onto an exempt path so a per-token
+# check reads one path, and by walking into the directory first.
+bash_case ask 'cat ~/.claude/agent-toolkit/README.md && echo pwned > ~/.claude/settings.json'
+bash_case ask 'cat ~/.claude/agent-toolkit/README.md ; echo pwned > ~/.claude/settings.json'
+bash_case ask 'cat ~/.claude/agent-toolkit/README.md | tee ~/.claude/settings.json'
+bash_case ask 'cat ~/.claude/backups/x || cp /tmp/s.json ~/.claude/settings.json'
+bash_case ask 'cp /tmp/a ~/.claude/agent-toolkit/x>~/.claude/settings.json'
+bash_case ask 'echo pwned > ${HOME}/.claude/settings.json'
+bash_case ask 'cp /tmp/s.json "$HOME"/.claude/settings.json'
+bash_case ask 'cd ~/.claude && echo pwned > settings.json'
+# …and the exempt paths themselves stay frictionless, including the toolkit
+# checkout named WITHOUT a trailing slash — the form `cd` uses, and the one the
+# gate above matches too, so both patterns must end the same way.
+bash_case allow 'echo x > ~/.claude/projects/foo'
+bash_case allow 'cd ~/.claude/agent-toolkit && cp a b'
+bash_case allow 'cat ~/.claude/agent-toolkit/README.md && cat ~/.claude/settings.json'
+
 # ── guard-config: device config asks, Claude-owned dirs and repos don't ──
 file_case ask "$HOME/.claude/settings.json"
 file_case ask "$HOME/.claude/settings.local.json"
@@ -114,6 +137,38 @@ file_case allow "$HOME/.claude/projects/-some-project/memory/fact.md"
 file_case allow "$HOME/.claude/backups/settings.json.bak"
 file_case allow "/proj/src/main.rs"
 file_case allow "/tmp/scratch/notes.md"
+
+# ── guard-config: the toolkit checkout is free from INSIDE it, gated from OUTSIDE ─
+# The working-directory approval made the whole checkout auto-writable, so without
+# this gate agents/*, core.md, skills/**, install.sh — the instruction surface
+# every future session loads — could be rewritten with NO prompt from an unrelated
+# repo. Driven under a FIXTURE HOME with a symlinked checkout (never the real
+# ~/.claude) and cwd carried in the payload the way Claude Code sends it; the
+# target is reached THROUGH the ~/.claude symlink, so only realpath matching
+# catches it. Four directions, so a fix that drops the gate (outside→allow) and one
+# that over-gates (inside→ask) both fail, and the hooks/* gate stays put.
+fh="$(cd "$(mktemp -d)" && pwd -P)"; mkdir -p "$fh/.claude"
+tkco="$(cd "$(mktemp -d)" && pwd -P)"; mkdir -p "$tkco/hooks" "$tkco/agents"
+ln -s "$tkco" "$fh/.claude/agent-toolkit"
+gc_case() { # $1 expected, $2 file_path, $3 cwd, $4 label
+  local out got
+  out="$(jq -cn --arg f "$2" --arg c "$3" '{tool_name:"Write",tool_input:{file_path:$f},cwd:$c}' \
+        | HOME="$fh" "$root/hooks/guard-config.sh" 2>/dev/null)"
+  if [ -z "$out" ]; then got="allow"; else
+    got="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision // "allow"' 2>/dev/null || echo unparseable)"
+  fi
+  if [ "$got" = "$1" ]; then pass=$((pass + 1)); else
+    fail=$((fail + 1)); printf 'FAIL %-14s want=%-5s got=%-5s  %s\n' guard-config.sh "$1" "$got" "$4"
+  fi
+}
+gc_case ask   "$fh/.claude/agent-toolkit/core.md"            "/proj"        "core.md, cwd OUTSIDE → ask (the newly-exposed case)"
+gc_case allow "$fh/.claude/agent-toolkit/core.md"            "$tkco"        "core.md, cwd INSIDE (root) → allow (the workspace)"
+gc_case allow "$fh/.claude/agent-toolkit/skills/s/SKILL.md"  "$tkco/agents" "skills file, cwd deep INSIDE → allow"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "$tkco"        "hooks file, cwd INSIDE → still ask (unchanged)"
+gc_case ask   "$fh/.claude/agent-toolkit/hooks/notify.sh"    "/proj"        "hooks file, cwd OUTSIDE → ask (unchanged)"
+gc_case ask   "$fh/.claude/agent-toolkit/install.sh"         ""             "install.sh, cwd absent → ask (fail-safe: can't confirm inside)"
+gc_case allow "/proj/src/main.rs"                            "/proj"        "a normal repo write elsewhere → unaffected"
+rm -rf "$fh" "$tkco"
 
 # ── statusline: never crashes, always prints a line ──
 sl() {
@@ -359,63 +414,138 @@ if jq -e '.enabledPlugins["pr-review-toolkit@claude-plugins-official"] == true
 fi
 rm -rf "$fh"
 
-# ── install.sh: the .env merge writes the toolkit env var, keeping yours ──────
-# AGENT_TEAMS=1 is the only env var the toolkit sets. CLAUDE_CODE_ENABLE_TASKS=0
-# is a real switch — it turns the four Task tools off in favor of the older
-# TodoWrite checklist — set here briefly, then reverted once a server-side flag
-# keyed to the model turned out to be suppressing both families at once. A stale
-# =0 would genuinely disable the Task tools the day that flag lifts, so the merge
-# must DELETE it from a settings.json a previous install wrote it into, not just
-# stop writing it. Same silent single-quoted-jq trap as above, so seed both the
-# stale key and an unrelated one: one assertion then covers the var going
-# missing, the stale switch surviving, and your own key being clobbered.
+# ── install.sh: the .env merge writes the toolkit env vars, keeping yours ─────
+# Two vars are set. AGENT_TEAMS=1 turns on named teammates and SendMessage.
+# MAX_SUBAGENT_SPAWN_DEPTH=3 restores the two-level DELEGATION model every agent
+# definition is written around AND the one-deeper review gate a level-2 developer
+# must still run — as of Claude Code 2.1.217 a subagent cannot spawn one at all by
+# default, and nothing in a session announces that, so the day this var silently
+# stops being written the fan-out just quietly flattens again.
+# CLAUDE_CODE_ENABLE_TASKS=0 is a real switch — it turns the four Task tools off
+# in favor of the older TodoWrite checklist — set here briefly, then reverted
+# once a server-side flag keyed to the model turned out to be suppressing both
+# families at once. A stale =0 would genuinely disable the Task tools the day
+# that flag lifts, so the merge must DELETE it from a settings.json a previous
+# install wrote it into, not just stop writing it. Same silent single-quoted-jq
+# trap as above, so seed both the stale key and an unrelated one: one assertion
+# then covers either var going missing, the stale switch surviving, and your own
+# key being clobbered.
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
 printf '{"env":{"MY_OWN_VAR":"keep","CLAUDE_CODE_ENABLE_TASKS":"0"}}\n' > "$fh/.claude/settings.json"
 HOME="$fh" "$root/install.sh" >/dev/null 2>&1
 if jq -e '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS == "1"
+          and .env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH == "3"
           and (.env | has("CLAUDE_CODE_ENABLE_TASKS") | not)
           and .env.MY_OWN_VAR == "keep"' \
      "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: AGENT_TEAMS missing (the single-quoted-jq trap), a stale ENABLE_TASKS=0 not cleaned out, or your own .env key clobbered"
+  fail=$((fail + 1)); echo "FAIL install.sh     env merge wrong: AGENT_TEAMS or MAX_SUBAGENT_SPAWN_DEPTH missing (the single-quoted-jq trap), a stale ENABLE_TASKS=0 not cleaned out, or your own .env key clobbered"
 fi
 rm -rf "$fh"
 
-# ── install.sh: reads of the non-secret ~/.claude dirs are pre-approved ──────
-# Reads outside the workspace prompt even in auto mode, which stalls a background
-# agent on a human. Seed a settings.json that already carries every permissions
-# field, so one assertion covers every failure mode: the entries missing (the
-# same single-quoted-jq trap as above), the merge dropping fields the user set,
-# a secret-bearing path (settings.json / credentials / a blanket ~/.claude/**)
-# creeping into the allowlist, the blanket projects rule returning (only the
-# memory dirs are readable — the session transcripts beside them stay gated),
-# and the checkout rule going missing (every ~/.claude/skills entry is a symlink
-# into the checkout, and a read is allowed only when the resolved realpath
-# matches a rule too). Paths follow HOME, and the DOUBLED leading slash is the
-# part that means absolute — a single slash would anchor the pattern at the
-# settings directory and match nothing. Installing twice must change nothing:
-# our rules are dropped before being re-appended.
+# ── install.sh: the three working directories, and the read rules they retire ─
+# Anything outside the workspace prompts even in auto mode, which stalls a
+# background agent on a human. Three directories cover it — the config dir, the
+# per-uid scratchpad root every session is told to use, and this checkout (each
+# ~/.claude/skills entry is a symlink into it, and access is judged on the
+# resolved realpath, so the symlink directory alone is not enough). They subsume
+# the five Read() rules earlier installs wrote into permissions.allow, which the
+# merge must now SUBTRACT rather than merely stop writing — otherwise every
+# already-installed machine keeps carrying them forever. Seed exactly that
+# pre-migration file, with every permissions field populated, so one assertion
+# covers every failure mode: a directory missing (the same single-quoted-jq trap
+# as above), a retired rule surviving, the merge dropping fields or entries the
+# user set, and the whole thing not being idempotent (ours are dropped before
+# being re-appended). The directory set is matched EXACTLY rather than by
+# containment, because the failure that matters here is a directory too BROAD —
+# $HOME or / instead of the three — and containment would wave that through.
+# Paths follow HOME; the retired rules are matched in the
+# DOUBLED-leading-slash form they were written in, which is what made them
+# absolute, while a working directory is a plain path and takes no such prefix.
+# The seeded deny rule is asserted alongside the four carve-outs the config
+# working directory obliges — those have their own case below.
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
-printf '%s\n' '{"permissions":{"allow":["Bash(ls:*)"],"deny":["Read(//etc/shadow)"],"ask":["Bash(curl:*)"],"additionalDirectories":["/srv/shared"],"defaultMode":"plan"}}' \
+jq -n --arg cfg "$fh/.claude" --arg co "$(cd "$root" && pwd -P)" '{permissions:{
+  allow: (["Bash(ls:*)"]
+          + (["plugins","agents","skills"] | map("Read(/" + $cfg + "/" + . + "/**)"))
+          + ["Read(/" + $cfg + "/projects/**/memory/**)", "Read(/" + $co + "/**)"]),
+  deny: ["Read(//etc/shadow)"], ask: ["Bash(curl:*)"],
+  additionalDirectories: ["/srv/shared"], defaultMode: "plan"}}' \
   > "$fh/.claude/settings.json"
 HOME="$fh" "$root/install.sh" >/dev/null 2>&1
 cp "$fh/.claude/settings.json" "$fh/pass1.json"
 HOME="$fh" "$root/install.sh" >/dev/null 2>&1
 if cmp -s "$fh/pass1.json" "$fh/.claude/settings.json" \
-   && jq -e --arg cfg "$fh/.claude" --arg co "$(cd "$root" && pwd -P)" '
-      ((["plugins","agents","skills"] | map("Read(/" + $cfg + "/" + . + "/**)"))
-       + ["Read(/" + $cfg + "/projects/**/memory/**)", "Read(/" + $co + "/**)"]) as $want
+   && jq -e --arg cfg "$fh/.claude" --arg co "$(cd "$root" && pwd -P)" \
+           --arg scratch "/tmp/claude-$(id -u)" '
+      [$cfg, $scratch, $co] as $want_dirs
+      | ((["plugins","agents","skills"] | map("Read(/" + $cfg + "/" + . + "/**)"))
+         + ["Read(/" + $cfg + "/projects/**/memory/**)", "Read(/" + $co + "/**)"]) as $retired
+      | (.permissions.additionalDirectories // []) as $dirs
       | (.permissions.allow // []) as $got
-      | ($want - $got) == []
-        and ($got | index("Read(/" + $cfg + "/projects/**)")) == null
-        and ($got | length) == ($got | unique | length)
+      | ($dirs | sort) == ((["/srv/shared"] + $want_dirs) | sort)
+        and ($got - $retired) == $got
         and ($got | index("Bash(ls:*)")) != null
-        and .permissions.deny == ["Read(//etc/shadow)"]
+        and .permissions.deny == ["Read(//etc/shadow)",
+                                  "Read(/" + $cfg + "/.credentials.json)",
+                                  "Read(/" + $cfg + "/settings*.json)",
+                                  "Read(/" + $cfg + "/backups/settings.json.*)",
+                                  "Read(/" + $cfg + "/backups/.claude.json.backup.*)"]
         and .permissions.ask == ["Bash(curl:*)"]
-        and .permissions.additionalDirectories == ["/srv/shared"]
         and .permissions.defaultMode == "auto"
-        and ($got | map(select(test("credentials|settings\\.json|\\.claude/\\*\\*"))) | length) == 0
     ' "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
-  fail=$((fail + 1)); echo "FAIL install.sh     read allowlist wrong: a rule missing (checkout/memory), the blanket projects rule back, a permissions field dropped, a secret path leaked, or not idempotent"
+  fail=$((fail + 1)); echo "FAIL install.sh     working directories wrong: one missing or too broad (config/scratchpad/checkout), a retired Read() rule left behind, a permissions field or entry dropped, duplicated, or not idempotent"
+fi
+rm -rf "$fh"
+
+# ── …and an allowlist that was nothing BUT those retired rules leaves no husk ──
+# The cleanup subtracts from a list it may empty, so without dropping the key a
+# migrated settings.json (and every fresh one) would carry a meaningless allow:[].
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+jq -n --arg cfg "$fh/.claude" --arg co "$(cd "$root" && pwd -P)" '{permissions:{allow:
+  ((["plugins","agents","skills"] | map("Read(/" + $cfg + "/" + . + "/**)"))
+   + ["Read(/" + $cfg + "/projects/**/memory/**)", "Read(/" + $co + "/**)"])}}' \
+  > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if jq -e '(.permissions | has("allow")) | not' "$fh/.claude/settings.json" >/dev/null 2>&1; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     an allowlist emptied by the migration must be removed, not left as allow:[]"
+fi
+rm -rf "$fh"
+
+# ── …and the reads that working directory must NOT hand over ──
+# Approving ~/.claude wholesale approves a read of .credentials.json with it — and
+# of settings*.json (settings.json AND the machine-local settings.local.json),
+# which on another machine carry MCP tokens or API keys in their env block, and of
+# the historical copies in backups/ (settings.json.* this installer writes, and
+# .claude.json.backup.* Claude Code writes, which holds the mcpServers tokens). A
+# deny rule is evaluated BEFORE the working-directory check, so four entries close
+# them. Seed a deny rule of your own and install twice, so a single assertion
+# covers any of the four missing entirely (the single-quoted-jq trap again), a
+# leading slash not DOUBLED — a single slash anchors the pattern at the settings
+# dir where it matches nothing, leaving the file readable while the rule LOOKS
+# present — your own entry clobbered, ours appended a second time on re-run, and
+# the list widened beyond those four (each backups rule names a filename glob,
+# never backups/ wholesale, which holds unrelated files). settings*.json widens to
+# settings.local.json without catching unrelated JSON like stats-cache.json — the
+# literal settings prefix cannot match it. Read-tool only by design: the doctor
+# and the update-config skill reach settings through jq in Bash, which no rule
+# here touches. Matched exactly rather than by containment, because both failures
+# that matter are entries missing or extra.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"permissions":{"deny":["Read(//etc/shadow)"]}}\n' > "$fh/.claude/settings.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+cp "$fh/.claude/settings.json" "$fh/pass1.json"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+if cmp -s "$fh/pass1.json" "$fh/.claude/settings.json" \
+   && jq -e --arg cfg "$fh/.claude" '
+      ((.permissions.deny // []) | sort)
+        == ((["Read(//etc/shadow)",
+              "Read(/" + $cfg + "/.credentials.json)",
+              "Read(/" + $cfg + "/settings*.json)",
+              "Read(/" + $cfg + "/backups/settings.json.*)",
+              "Read(/" + $cfg + "/backups/.claude.json.backup.*)"]) | sort)
+    ' "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     deny rules wrong (credentials / settings*.json / backups/settings.json.* / backups/.claude.json.backup.*): one missing, single-slashed (anchors at the settings dir, matching nothing), duplicated on re-run, your own deny entry clobbered, or the deny list widened"
 fi
 rm -rf "$fh"
 
@@ -430,40 +560,190 @@ rm -rf "$fh"
 # the suite green, the install exiting 0, and the doctor green too (its path
 # check only validates paths it FINDS in settings, so a gutted one gives it
 # nothing to check). Hence this assertion on the TAIL of the program.
-# The event list is derived from the installer SOURCE, never from a run of it:
-# deriving it from the produced settings (or from desired_settings output) would
-# collapse to "whatever landed" and pass vacuously on the very truncation this
-# exists to catch, while a hard-coded list drifts silently the day an event is
-# added. "+ [" is the marker — UserPromptSubmit is only cleaned, never re-added.
-# The two sets must match EXACTLY, which makes the derivation self-checking: a
-# reformat that stops matching an event would otherwise drop it from the
-# requirement unnoticed, and here it fails instead — the event is wired in the
-# settings this just produced but absent from the derived list. HOME is fresh, so
-# every hook in that file is ours; a foreign one could not skew either side.
+#
+# The whole TRIPLE is asserted — event → matcher → script (and async) — matched
+# EXACTLY, because each part is load-bearing and each breaks silently on its
+# own. Asserting event NAMES only, which this used to do, is vacuous: it stays
+# green when "Bash" becomes "Bash " and guard-git.sh never sees a git push
+# again, when the matcher is dropped so a guard fires on every tool, and when
+# guard-git.sh and guard-config.sh swap places between two PreToolUse entries —
+# the publish gate is gone in all three, with install exiting 0 and the doctor
+# green. It also could not tell notify.sh done wired to Notification from the
+# right way round.
+# The table below is written out here rather than derived from install.sh —
+# derived (from its source text, from its output, either way), it would move
+# WITH any mutation of the installer and assert nothing. The installer's own
+# TOOLKIT_WIRING declaration is what the doctor checks a machine against; this
+# is the independent statement of the same contract, so the two are compared by
+# running them against each other. A hook added there therefore has to be added
+# here too: that is the assertion doing its job, not a chore.
+# HOME is fresh, so every hook in that file is ours; a foreign one could not
+# skew either side.
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
 HOME="$fh" "$root/install.sh" >/dev/null 2>&1
-want_events="$(grep -oE '\.hooks\.[A-Za-z]+ = clean\([^)]*\) \+ \[' "$root/install.sh" \
-  | grep -oE '\.hooks\.[A-Za-z]+' | cut -d. -f3 | sort -u)"
-missing="$(jq -r --arg want "$want_events" '
-    . as $s
-    | ($want | split("\n") | map(select(length > 0))) as $want_ev
-    | (($s.hooks // {}) | to_entries
-       | map(select((.value | map((.hooks // []) | map(.command // ""))
-                     | flatten | join(" ")) | test("agent-toolkit")))
-       | map(.key)) as $have_ev
-    | [ ((if (($s.statusLine.command // "") | test("agent-toolkit")) then [] else ["statusLine"] end)
-         + (($want_ev - $have_ev) | map("hooks." + .))) | select(length > 0)
-        | "not wired: " + join(", "),
-        (($have_ev - $want_ev) | map("hooks." + .)) | select(length > 0)
-        | "wired but missed by the derivation: " + join(", ") ]
-    | join("; ")' "$fh/.claude/settings.json" 2>/dev/null)" \
-  || missing="<jq could not read the installed settings.json>"
-if [ -z "$want_events" ]; then
-  fail=$((fail + 1)); echo "FAIL install.sh     derived NO wired hook events from install.sh — the derivation is stale, so this assertion proves nothing"
-elif [ -n "$missing" ]; then
-  fail=$((fail + 1)); echo "FAIL install.sh     installed settings.json is missing toolkit wiring: $missing — a truncated merge program writes a valid but gutted config"
-else
+b="$fh/.claude/agent-toolkit"
+got_wiring="$(jq -Sc '
+  [ (.hooks // {}) | to_entries[] as $ev | $ev.value[] as $e | ($e.hooks // [])[] as $h
+    | select(($h.command // "") | test("agent-toolkit"))
+    | {event: $ev.key, matcher: ($e.matcher // ""), command: ($h.command // ""),
+       async: ($h.async // false)} ] | sort' \
+  "$fh/.claude/settings.json" 2>/dev/null)"
+want_wiring="$(jq -Scn --arg b "$b" '[
+  {event:"SessionStart", matcher:"startup|resume|clear", command:($b+"/install.sh --sync"),        async:false},
+  {event:"PreToolUse",   matcher:"Bash",                 command:($b+"/hooks/guard-git.sh"),       async:false},
+  {event:"PreToolUse",   matcher:"Write|Edit|NotebookEdit", command:($b+"/hooks/guard-config.sh"), async:false},
+  {event:"PreToolUse",   matcher:"mcp__linear.*",        command:($b+"/hooks/guard-linear.sh"),    async:false},
+  {event:"PostToolUse",  matcher:"Write|Edit",           command:($b+"/hooks/sync-on-skill-edit.sh"), async:false},
+  {event:"PostToolUse",  matcher:"Write|Edit",           command:($b+"/hooks/format-on-edit.sh"),  async:true},
+  {event:"SubagentStop", matcher:"",                     command:($b+"/hooks/reap-managed.sh"),    async:false},
+  {event:"SessionEnd",   matcher:"",                     command:($b+"/hooks/reap-managed.sh"),    async:false},
+  {event:"Notification", matcher:"",                     command:($b+"/hooks/notify.sh alert"),    async:false},
+  {event:"Stop",         matcher:"",                     command:($b+"/hooks/notify.sh done"),     async:false}
+] | sort')"
+sl_cmd="$(jq -r '.statusLine.command // ""' "$fh/.claude/settings.json" 2>/dev/null)"
+if [ "$got_wiring" = "$want_wiring" ] && [ "$sl_cmd" = "$b/hooks/statusline.py" ]; then
   pass=$((pass + 1))
+else
+  fail=$((fail + 1))
+  echo "FAIL install.sh     installed wiring is not exactly event→matcher→script (a hook missing, a matcher changed, two scripts swapped, an async flag flipped, or the statusline gone)"
+  echo "                    want: $want_wiring"
+  echo "                    got:  $got_wiring"
+  echo "                    statusLine: $sl_cmd (want $b/hooks/statusline.py)"
+fi
+rm -rf "$fh"
+
+# ── install.sh: the doctor notices a hook that went missing from settings.json ─
+# The case the doctor exists for is a machine whose settings.json quietly lost a
+# hook — a hand-edit, a partial merge, a restored backup — because from then on
+# git push runs with NO publish gate. The requirement it checks against used to
+# be scraped out of install.sh's own source text and was event names only, which
+# fails twice over: reformat one merge line and that event drops out of the
+# requirement (still green), and an entry that loses just guard-git.sh keeps the
+# PreToolUse name alive (still green). So tamper with the two ways that leave
+# the event standing and require the doctor to name what is gone. --sync also
+# reports the file as stale here, and exits nonzero either way, so the exit code
+# proves nothing on its own — the wiring message is what is asserted.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+tamper() { jq "$1" "$fh/.claude/settings.json" > "$fh/t.json" && mv "$fh/t.json" "$fh/.claude/settings.json"; }
+tamper '.hooks.PreToolUse |= map(select(([.hooks[]?.command // ""] | any(test("guard-git"))) | not))'
+out_drop="$(HOME="$fh" "$root/install.sh" --sync 2>&1)"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1        # repair, then break it differently
+tamper '.hooks.PreToolUse |= map(if .matcher == "Bash" then .matcher = "Bash " else . end)'
+out_matcher="$(HOME="$fh" "$root/install.sh" --sync 2>&1)"
+names_it() { case "$1" in *"missing toolkit wiring"*"guard-git.sh"*) return 0 ;; *) return 1 ;; esac; }
+if names_it "$out_drop" && names_it "$out_matcher"; then pass=$((pass + 1)); else
+  fail=$((fail + 1))
+  echo "FAIL install.sh     the doctor did not name the dropped/mis-matched guard-git.sh hook"
+  echo "                    dropped-hook run: $out_drop"
+  echo "                    changed-matcher run: $out_matcher"
+fi
+rm -rf "$fh"
+
+# ── install.sh: a jq merge that ABORTS fails loudly, never "already current" ───
+# If desired_settings aborts — a pre-existing permissions.allow that is a string,
+# not an array, makes jq exit non-zero with empty output — the old guard read that
+# empty output as already-current: green doctor, exit 0, a fresh version stamp, and
+# NOTHING applied. Assert it now says "merge failed", never "already current", and
+# leaves no stamp. (The mutation is restoring the old if [ -n "$new" ] guard: then
+# it reports already-current, and this case catches it.)
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+printf '{"permissions":{"allow":"not-an-array"}}\n' > "$fh/.claude/settings.json"
+out="$(HOME="$fh" "$root/install.sh" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] \
+   && printf '%s' "$out" | grep -qi "merge failed" \
+   && ! printf '%s' "$out" | grep -qi "already current" \
+   && [ ! -s "$fh/.claude/agent-toolkit-version" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     a jq merge that aborts must fail loudly (not report already-current) and must not stamp (rc=$rc)"
+fi
+rm -rf "$fh"
+
+# ── install.sh: a $HOME containing a space keeps the doctor green ──────────────
+# The doctor stripped a wired command to its executable with ${cmd%% *} and scanned
+# the pointer import with ^@/[^ ]+ — both split at the FIRST space, so a $HOME with
+# a space truncated every wired path and every hook read as missing: 12 false
+# errors, exit 1, no stamp, and it lands in session context every SessionStart.
+# Install under a spaced HOME and require a green, stamped doctor.
+tmp="$(mktemp -d)"; fh="$tmp/home dir"; mkdir -p "$fh/.claude"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1; rc=$?
+if [ "$rc" -eq 0 ] && [ -s "$fh/.claude/agent-toolkit-version" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     a \$HOME with a space breaks the doctor (rc=$rc) — a wired-hook or pointer path split at the space"
+fi
+rm -rf "$tmp"
+
+# ── install.sh: a foreign hook with args (no .sh/.py) is not false-flagged ─────
+# The spaced-$HOME fix scopes its .sh/.py suffix-matching to $STABLE commands, so a
+# FOREIGN hook keeps the old first-space arg-strip — else an existing executable
+# plus an arg and no extension ("/usr/bin/env X") would read as missing. Seed
+# exactly that and require the doctor not to name it (green, stamped). $STABLE
+# commands still work, so this is distinct from the spaced-HOME case above.
+feh="$(command -v env)"
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+jq -n --arg c "$feh marker-arg" '{hooks:{Stop:[{hooks:[{type:"command",command:$c}]}]}}' \
+  > "$fh/.claude/settings.json"
+out="$(HOME="$fh" "$root/install.sh" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -s "$fh/.claude/agent-toolkit-version" ] \
+   && ! printf '%s' "$out" | grep -qF "$feh marker-arg"; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     a foreign hook with args and no .sh/.py extension must not be reported missing (rc=$rc)"
+fi
+rm -rf "$fh"
+
+# ── install.sh: the doctor flags pr-review-toolkit enabled-but-not-installed ───
+# install.sh ENABLES the plugin in settings, but enabling is not installing (that
+# needs `claude plugin install`). The review gate every developer/reviewer agent
+# spawns IS this plugin's agents, so absent it there is no gate — an unknown
+# subagent type. Drive both states against a fixture installed_plugins.json (never
+# the real cache): absent → the doctor names it and points at the fix; present →
+# silent about the plugin.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude/plugins"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1                 # no installed_plugins.json yet
+out_absent="$(HOME="$fh" "$root/install.sh" --sync 2>&1)"
+printf '{"plugins":{"pr-review-toolkit@claude-plugins-official":[{"scope":"user"}]}}\n' \
+  > "$fh/.claude/plugins/installed_plugins.json"
+out_present="$(HOME="$fh" "$root/install.sh" --sync 2>&1)"
+if printf '%s' "$out_absent" | grep -q "pr-review-toolkit@claude-plugins-official is enabled but not installed" \
+   && ! printf '%s' "$out_present" | grep -qi "pr-review-toolkit.*not installed"; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     doctor must flag pr-review-toolkit enabled-but-not-installed, and go silent once installed"
+fi
+rm -rf "$fh"
+
+# ── install.sh: --sync applies agents+skills, so it must stamp the version too ─
+# --sync IS the ordinary edit-commit-new-session path (SessionStart runs it): it
+# re-links skills and re-copies agents, so the "are my changes applied?" light must
+# clear on it, not wait for a manual full install. Full-install first (clean
+# settings), drop the stamp, then --sync, and the stamp must come back. The gate
+# stays tk_problems, so a stale settings.json would still hold it — but here it is
+# current, so the only thing that could withhold the stamp is the old MODE=full gate.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude"
+HOME="$fh" "$root/install.sh" >/dev/null 2>&1
+rm -f "$fh/.claude/agent-toolkit-version"
+HOME="$fh" "$root/install.sh" --sync >/dev/null 2>&1
+if [ -s "$fh/.claude/agent-toolkit-version" ]; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     --sync must stamp the version (it re-applies agents+skills), not leave the freshness light stale"
+fi
+rm -rf "$fh"
+
+# ── install.sh: a moved checkout drops its OLD write-approved dir ──────────────
+# additionalDirectories lists the checkout so agents can write in it; the merge
+# used to subtract only the CURRENT checkout before re-adding, so moving the
+# checkout (a workflow the README advertises) left the OLD path write-approved
+# forever, pointing at a location that may later hold an unrelated project. Copy
+# the toolkit to A and B, install from each under one HOME (the stable symlink
+# carries A forward as $prevroot), and assert the final additionalDirectories
+# carries B and the user dir, never A. HOME is made physical so it matches the
+# pwd -P ROOT each copy computes.
+fh="$(cd "$(mktemp -d)" && pwd -P)"; mkdir -p "$fh/.claude"
+printf '{"permissions":{"additionalDirectories":["/srv/mine"]}}\n' > "$fh/.claude/settings.json"
+mk_copy() { mkdir -p "$1"; for p in install.sh install-skills.sh core.md CLAUDE.md hooks agents skills; do cp -a "$root/$p" "$1/"; done; }
+A="$fh/checkout-A"; B="$fh/checkout-B"; mk_copy "$A"; mk_copy "$B"
+HOME="$fh" "$A/install.sh" >/dev/null 2>&1
+HOME="$fh" "$B/install.sh" >/dev/null 2>&1
+if jq -e --arg a "$A" --arg b "$B" '
+     (.permissions.additionalDirectories // []) as $d
+     | ($d | any(. == $b)) and ($d | any(. == $a) | not)
+       and ($d | any(. == "/srv/mine"))' \
+     "$fh/.claude/settings.json" >/dev/null 2>&1; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL install.sh     a moved checkout must drop its old additionalDirectories entry, keep the new one and user-added dirs"
 fi
 rm -rf "$fh"
 
@@ -546,7 +826,70 @@ if [ "$(xdg_of "$bare")" = "/run/user/$(id -u)" ] \
    && [ "$(xdg_of "$given")" = "$nb/session-xdg" ]; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL notify.sh      a bare hook env must resolve XDG_RUNTIME_DIR to /run/user/<euid> and a provided one must survive (bare=$bare given=$given)"
 fi
+
+# (6) aplay decodes only WAV — never Ogg. On an alsa-only host (aplay the SOLE
+#     player) a .oga sound must fall through to silent success: choosing aplay
+#     there errors into the /dev/null redirect below — the exact mute-notifier
+#     regression, invisible while the doctor still sees a player on PATH. Yet a
+#     .wav sound on that same host MUST still resolve to aplay (it can decode
+#     WAV). A toolkit root with alert=.oga and done=.wav proves both directions,
+#     so neither "always skip aplay" nor "always accept aplay" can pass.
+ak="$nb/alsa-tk"; mkdir -p "$ak/hooks" "$ak/sounds" "$nb/alsa"
+cp "$root/hooks/notify.sh" "$ak/hooks/notify.sh"
+: > "$ak/sounds/alert.oga"; : > "$ak/sounds/done.wav"
+for b in bash dirname setsid; do
+  bp="$(command -v "$b" 2>/dev/null)" && ln -s "$bp" "$nb/alsa/$b"
+done
+printf '#!/bin/sh\nexit 0\n' > "$nb/alsa/aplay"; chmod +x "$nb/alsa/aplay"
+oga_line="$(PATH="$nb/alsa" NOTIFY_DRYRUN=1 "$ak/hooks/notify.sh" alert)"
+wav_line="$(PATH="$nb/alsa" NOTIFY_DRYRUN=1 "$ak/hooks/notify.sh" done)"
+if [ -z "$oga_line" ] && PATH="$nb/alsa" NOTIFY_DRYRUN=1 "$ak/hooks/notify.sh" alert >/dev/null 2>&1 \
+   && [ "${wav_line%%|*}" = "aplay" ] && [ "$(sound_of "$wav_line")" = "$ak/sounds/done.wav" ]; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL notify.sh      aplay must be skipped for .oga (silent) yet chosen for .wav (oga=$oga_line wav=$wav_line)"
+fi
 rm -rf "$nb"
+
+# ── install.sh: the doctor's sound check matches notify.sh's aplay-can't-Ogg rule ─
+# notify.sh case 6 above proves the RUNTIME skips aplay for the .oga freedesktop
+# fallbacks (aplay decodes only WAV); this proves the DOCTOR now agrees. An
+# aplay-ONLY host with the default .oga sounds plays NOTHING, yet the old doctor
+# warned only when ALL of paplay/pw-play/ffplay/aplay were absent — so it stayed
+# silent and reported sound wired: the same doctor-vs-reality blind spot, one
+# layer up. The doctor now mirrors notify.sh's coarse decision — aplay alone is
+# enough only if the toolkit ships .wav overrides for BOTH notify kinds. Drive the
+# REAL doctor with a PATH whose only audio player is a fake aplay: the host's real
+# players are masked by mirroring $PATH minus the four, so this is hermetic even
+# here where all four are installed. A fixture checkout whose sounds/ we control
+# gives the with/without-.wav states without touching the real repo; a fake ffplay
+# added last is the richer-player case. Three states, one fixture: aplay+no-wav
+# warns, aplay+both-wav silent, ffplay silent — so neither "aplay always counts"
+# (the bug) nor "aplay never counts" can pass.
+sc="$(mktemp -d)"; scbin="$sc/bin"; mkdir -p "$scbin"
+IFS=: read -ra scpath <<< "$PATH"
+for d in "${scpath[@]}"; do
+  [ -d "$d" ] || continue
+  ln -s "$d"/* "$scbin/" 2>/dev/null || true   # first-wins union of the real PATH
+done
+# Drop the four audio players (and any literal-'*' link an empty PATH dir left),
+# so command -v finds exactly the fake players we inject below and nothing else.
+rm -f "$scbin/paplay" "$scbin/pw-play" "$scbin/ffplay" "$scbin/aplay" "$scbin/*"
+printf '#!/bin/sh\nexit 0\n' > "$scbin/aplay"; chmod +x "$scbin/aplay"   # command -v only checks it exists+x
+sctk="$sc/tk"; mkdir -p "$sctk"
+for p in install.sh install-skills.sh core.md CLAUDE.md hooks agents skills; do cp -a "$root/$p" "$sctk/"; done
+sc_run() { rm -rf "$sc/home"; mkdir -p "$sc/home/.claude"; PATH="$scbin" HOME="$sc/home" "$sctk/install.sh" 2>&1; }
+sc_warns() { case "$1" in *"only aplay is installed"*) return 0 ;; *) return 1 ;; esac; }
+out_nowav="$(sc_run)"
+mkdir -p "$sctk/sounds"; : > "$sctk/sounds/alert.wav"; : > "$sctk/sounds/done.wav"
+out_wav="$(sc_run)"
+printf '#!/bin/sh\nexit 0\n' > "$scbin/ffplay"; chmod +x "$scbin/ffplay"
+out_ffplay="$(sc_run)"
+if sc_warns "$out_nowav" && ! sc_warns "$out_wav" && ! sc_warns "$out_ffplay"; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1))
+  echo "FAIL install.sh     doctor sound check: aplay-only+no-wav must warn, but .wav overrides or a richer player must stay silent"
+fi
+rm -rf "$sc"
 
 # ── statusline: toolkit version segment shows the version, ⚠ only when stale ──
 fh="$(mktemp -d)"; mkdir -p "$fh/.claude"; ln -s "$root" "$fh/.claude/agent-toolkit"
@@ -558,6 +901,31 @@ out_stale="$(printf '{}' | HOME="$fh" python3 "$root/hooks/statusline.py" 2>/dev
 if printf '%s' "$out_fresh" | grep -q "v50·$realsha" && ! printf '%s' "$out_fresh" | grep -q '⚠' \
    && printf '%s' "$out_stale" | grep -q '⚠'; then pass=$((pass + 1)); else
   fail=$((fail + 1)); echo "FAIL statusline.py  toolkit version segment / stale ⚠ marker wrong"
+fi
+rm -rf "$fh"
+
+# ── statusline: freshness FAILS SAFE — a `?`, never a confident clean stamp — ──
+# ── when the rev-parse that verifies HEAD times out or errors ─────────────────
+# The bug this pins is the inverse: a swallowed TimeoutExpired left NO marker, so
+# the stamp asserted "your commits are applied" on a machine that had not re-run
+# install.sh — the exact failure the light exists to catch, silently inverted.
+# Only a POSITIVE sha match may render clean; a timeout/error must show `?` (never
+# a false clean, never a false ⚠). Fake gits make both directions deterministic
+# and hermetic — a real git that happened to be slow can't skew it — and the
+# timeout one uses exec-sleep so subprocess's SIGKILL leaves nothing behind.
+fh="$(mktemp -d)"; mkdir -p "$fh/.claude" "$fh/bin"; ln -s "$root" "$fh/.claude/agent-toolkit"
+printf 'v50·abc1234\n' > "$fh/.claude/agent-toolkit-version"
+run_sl() { printf '{}' | PATH="$fh/bin:$PATH" HOME="$fh" python3 "$root/hooks/statusline.py" 2>/dev/null; }
+printf '#!/bin/sh\nexec sleep 0.5\n' > "$fh/bin/git"; chmod +x "$fh/bin/git"    # every rev-parse times out
+out_to="$(run_sl)"
+printf '#!/bin/sh\necho abc1234\n' > "$fh/bin/git"; chmod +x "$fh/bin/git"      # rev-parse returns the recorded sha
+out_fresh2="$(run_sl)"
+if printf '%s' "$out_to"     | grep -q '⬡ v50·abc1234' \
+   && printf '%s' "$out_to"     | grep -q '?'  && ! printf '%s' "$out_to"     | grep -q '⚠' \
+   && printf '%s' "$out_fresh2" | grep -q '⬡ v50·abc1234' \
+   && ! printf '%s' "$out_fresh2" | grep -q '?' && ! printf '%s' "$out_fresh2" | grep -q '⚠'; then
+  pass=$((pass + 1)); else
+  fail=$((fail + 1)); echo "FAIL statusline.py  freshness must show '?' on git timeout/error and clean only on a verified match (timeout=$out_to fresh=$out_fresh2)"
 fi
 rm -rf "$fh"
 

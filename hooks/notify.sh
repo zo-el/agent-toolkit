@@ -38,10 +38,19 @@ if [ -z "$sound" ]; then
 fi
 [ -n "$sound" ] || exit 0            # nothing to play → silent, still success
 
-# Resolve a player (first that exists). ffplay carries flags; keep them together.
+# Resolve a player: the first that BOTH exists AND can decode the resolved sound.
+# aplay speaks only WAV/AU/VOC/raw — never Ogg or mp3 — so it is skipped for any
+# non-WAV sound. Choosing it for a .oga (every freedesktop fallback is Ogg) is a
+# silent failure: aplay errors into the /dev/null redirect below and the turn
+# goes unheard, while install.sh's doctor still sees a player on PATH and reports
+# sound wired. ffplay carries flags; keep them together.
+ext="${sound##*.}"
 player=""
 for p in "paplay" "pw-play" "ffplay -nodisp -autoexit -loglevel quiet" "aplay -q"; do
-  command -v "${p%% *}" >/dev/null 2>&1 && { player="$p"; break; }
+  cmd="${p%% *}"
+  command -v "$cmd" >/dev/null 2>&1 || continue
+  [ "$cmd" = "aplay" ] && [ "$ext" != "wav" ] && continue   # aplay can't decode Ogg/mp3
+  player="$p"; break
 done
 [ -n "$player" ] || exit 0
 
