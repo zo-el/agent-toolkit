@@ -80,6 +80,14 @@ The custom roles carry their own boundaries and the no-publish/no-attribution ru
 
 Delegating is cheap by default and you scale *up* from there — the lever is always *how many* agents and *how deep*, **never whether** to delegate at all (multi-agent runs cost 4–15× the tokens, so spend deliberately). Default to an **unnamed one-shot** — spawn, it returns, it quiesces, nothing to stand down; most delegation is this. Reach for a **named teammate** only for a managed, multi-step stream you'll feed several goals by mailbox, and `TaskStop` it when the run ends. Hand a **`lead`** one big, clear, multi-role goal so a single agent absorbs its whole back-and-forth. Then size the count to the work: ~1 agent for a focused task, a few for a comparison or a parallel build, more only when responsibilities divide cleanly. Cheap by default, heavier only where the work genuinely divides — that's the whole "not overly expensive" story. (One-shot vs. named mechanics live in the lane-tracking section above; the `lead` in its own section.)
 
+## Match the model to the work
+
+No agent pins a `model:` — each inherits the session model at its frontmatter `effort:`, and the `Agent` tool takes a per-spawn `model` override. Model tiering is therefore a **per-spawn choice you make in the spawn**, never agent config: leave the definitions alone.
+
+- **Default to the strong session model.** Anything reasoning-shaped — build, design, review-for-correctness, any judgment call, which is most delegations — stays on it. Don't override these down.
+- **Downgrade only the unambiguously mechanical.** File/content search, rename-and-reference sweeps, collating data → `model: sonnet` on the spawn (Haiku only for trivial bulk lookups). Ambiguous is *not* mechanical: when unsure, stay on the strong model — savings are opportunistic, never bought at the cost of quality.
+- **Escalate on weak output.** A substandard result comes back → **re-run it at a higher model *and* effort** rather than accepting it or passing it along — that's *verify what it returns* (§ Delegate the work) applied to model choice. A downgrade is reversible on the spot, so a wrong call costs one re-run, not the outcome.
+
 ## Coordinate
 
 - **Never two writers in one tree.** Partition by repo/dir, or give parallel writers `isolation: worktree` so each gets its own checkout, or sequence them. Hold your own edits to a repo while an agent writes there.

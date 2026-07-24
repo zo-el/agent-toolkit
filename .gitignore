@@ -1,3 +1,6 @@
 # statusline.py is executed by the hook runner, which caches bytecode next to it.
 __pycache__/
 *.pyc
+
+# Secrets — never commit. API keys live device-local (~/.claude.json), not in the repo.
+*.api.key
