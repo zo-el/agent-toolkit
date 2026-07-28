@@ -34,6 +34,70 @@ file_case() { # $1 expected, $2 file_path
     "$2"
 }
 
+capsule_case() { # $1 expected(valid|invalid), $2 fixture path
+  local out got
+  if [ "$1" = invalid ]; then
+    out="$(python3 "$root/tests/lanes/validate_context_capsules.py" --expect-invalid "$root/$2" 2>&1)"
+  else
+    out="$(python3 "$root/tests/lanes/validate_context_capsules.py" "$root/$2" 2>&1)"
+  fi
+  if [ $? -eq 0 ]; then got="$1"; else got="fail"; fi
+  if [ "$got" = "$1" ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL context-capsule want=%-7s got=%-5s  %s\n%s\n' "$1" "$got" "$2" "$out"
+  fi
+}
+
+# ── context capsules: platform-keyed supplement, not task-lane truth ──
+capsule_case valid   'orchestration/examples/context-capsule.valid.json'
+capsule_case valid   'orchestration/examples/context-capsule.task-tools-absent.json'
+capsule_case valid   'tests/fixtures/context-capsules/valid-platform.json'
+capsule_case valid   'tests/fixtures/context-capsules/valid-task-tools-absent.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-mismatched-lane-number.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-missing-number-prefix.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-supplemental-status-override.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-cross-lane-without-provenance.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-stale-mutating-action.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-fallback-masquerade.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-conflicting-assumptions-without-blocker.json'
+
+proof_case() { # $1 label, remaining args command expected to exit 0
+  local label out
+  label="$1"; shift
+  out="$($@ 2>&1)"
+  if [ $? -eq 0 ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL claude-proof %-24s\n%s\n' "$label" "$out"
+  fi
+}
+proof_fail_case() { # $1 label, remaining args command expected to exit nonzero
+  local label out
+  label="$1"; shift
+  out="$($@ 2>&1)"
+  if [ $? -ne 0 ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL claude-proof %-24s unexpectedly passed\n%s\n' "$label" "$out"
+  fi
+}
+proof_case fixture-breadth python3 "$root/tests/proof/claude_cli_proof.py" validate-fixtures
+proof_case stdin-command-shape python3 "$root/tests/proof/claude_cli_proof.py" build-command B1
+proof_fail_case resume-required python3 "$root/tests/proof/claude_cli_proof.py" build-command B5
+proof_case resume-command-shape python3 "$root/tests/proof/claude_cli_proof.py" build-command B5 --resume-id sess-b4
+proof_case failed-slot-preserved python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-failed-slot.json"
+proof_case budget-capped-wrapper python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-budget-capped-wrapper.json"
+proof_case matched-pair-comparison python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-matched-pair.json"
+proof_case actual-resume-ledger python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-actual-resume.json"
+proof_case regression-recorded python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-regression.json"
+proof_fail_case evidence-not-complete python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-failed-slot.json"
+proof_case proof-complete-ledger python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete.json"
+proof_fail_case unsafe-launch-controls python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-unsafe-launch-controls.json"
+
 # ── guard-git: deny — public words as the user, never allowed ──
 bash_case deny 'gh pr comment 5 --body "looks good"'
 bash_case deny 'gh issue comment 3 --body "fixed"'

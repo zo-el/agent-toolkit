@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zo-el/agent-toolkit/orchestration/context-capsule.schema.json",
+  "title": "Release A Slice 1 Platform-Keyed Context Capsule",
+  "description": "Supplemental lane-local context/provenance record keyed to a platform task/lane identity. Platform task tools remain canonical for live subject/status/dependencies/owner truth when present; this capsule may snapshot those fields only as freshness/evidence inputs. The stdlib validator in tests/lanes/validate_context_capsules.py enforces semantic invariants that JSON Schema cannot express portably.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "provenance",
+    "lane_identity",
+    "lane_local",
+    "cross_lane_references"
+  ],
+  "properties": {
+    "schema_version": {"const": "context-capsule/v1"},
+    "record_id": {"type": "string", "pattern": "^cc_[a-z0-9][a-z0-9_-]*$"},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "platform_identity": {"$ref": "#/$defs/platform_identity"},
+    "fallback_identity": {"$ref": "#/$defs/fallback_identity"},
+    "lane_identity": {"$ref": "#/$defs/lane_identity"},
+    "lane_local": {"$ref": "#/$defs/lane_local"},
+    "cross_lane_references": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/cross_lane_reference"},
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "non_empty_string": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_tools", "capture_source", "captured_at"],
+      "properties": {
+        "task_tools": {"enum": ["present", "absent"]},
+        "capture_source": {"$ref": "#/$defs/non_empty_string"},
+        "captured_at": {"$ref": "#/$defs/timestamp"},
+        "source_revision": {"$ref": "#/$defs/non_empty_string"}
+      }
+    },
+    "platform_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_tool", "platform_task_id", "platform_lane_id", "source_session_id", "canonical_snapshot"],
+      "properties": {
+        "task_tool": {"$ref": "#/$defs/non_empty_string"},
+        "platform_task_id": {"$ref": "#/$defs/non_empty_string"},
+        "platform_lane_id": {"$ref": "#/$defs/non_empty_string"},
+        "source_session_id": {"$ref": "#/$defs/non_empty_string"},
+        "canonical_snapshot": {"$ref": "#/$defs/canonical_snapshot"}
+      }
+    },
+    "canonical_snapshot": {
+      "type": "object",
+      "description": "Freshness/evidence snapshot only; consumers must re-read platform task state for live truth when task tools are present.",
+      "additionalProperties": false,
+      "required": ["lane_subject", "status", "dependencies", "owner", "snapshot_at", "source_revision"],
+      "properties": {
+        "lane_subject": {"type": "string", "pattern": "^#[1-9][0-9]* .+"},
+        "status": {"$ref": "#/$defs/non_empty_string"},
+        "dependencies": {"type": "array", "items": {"$ref": "#/$defs/lane_ref"}},
+        "owner": {"type": ["string", "null"]},
+        "assignee": {"type": ["string", "null"]},
+        "snapshot_at": {"$ref": "#/$defs/timestamp"},
+        "source_revision": {"$ref": "#/$defs/non_empty_string"}
+      }
+    },
+    "fallback_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fallback_lane_id", "fallback_reason", "reduced_fidelity", "non_platform_persisted"],
+      "properties": {
+        "fallback_lane_id": {"$ref": "#/$defs/non_empty_string"},
+        "fallback_reason": {"const": "task_tools_absent"},
+        "reduced_fidelity": {"const": true},
+        "non_platform_persisted": {"const": true}
+      }
+    },
+    "lane_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lane_number", "lane_label"],
+      "properties": {
+        "lane_number": {"type": "integer", "minimum": 1},
+        "lane_label": {"type": "string", "pattern": "^#[1-9][0-9]* .+"}
+      }
+    },
+    "lane_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lane_number", "lane_label"],
+      "properties": {
+        "lane_number": {"type": "integer", "minimum": 1},
+        "lane_label": {"type": "string", "pattern": "^#[1-9][0-9]* .+"},
+        "platform_lane_id": {"type": "string"},
+        "relationship": {"type": "string"}
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "captured_at"],
+      "properties": {
+        "kind": {"enum": ["path", "url", "command", "artifact", "platform_task", "note"]},
+        "ref": {"$ref": "#/$defs/non_empty_string"},
+        "captured_at": {"$ref": "#/$defs/timestamp"},
+        "source_revision": {"type": "string"},
+        "redacted": {"type": "boolean"}
+      }
+    },
+    "lane_local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facts", "assumptions", "decisions", "evidence", "blockers", "recovery_notes", "next_proposed_action"],
+      "properties": {
+        "facts": {"type": "array", "items": {"$ref": "#/$defs/statement"}},
+        "assumptions": {"type": "array", "items": {"$ref": "#/$defs/assumption"}},
+        "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence_ref"}},
+        "blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}},
+        "recovery_notes": {"type": "array", "items": {"$ref": "#/$defs/statement"}},
+        "next_proposed_action": {"$ref": "#/$defs/next_action"}
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "confidence"],
+      "properties": {
+        "statement": {"$ref": "#/$defs/non_empty_string"},
+        "confidence": {"enum": ["low", "medium", "high"]},
+        "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/evidence_ref"}}
+      }
+    },
+    "assumption": {
+      "allOf": [{"$ref": "#/$defs/statement"}],
+      "properties": {
+        "conflict_group": {"type": "string"},
+        "status": {"enum": ["active", "resolved", "rejected"]}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "rationale", "uses_cross_lane_facts", "evidence_refs"],
+      "properties": {
+        "statement": {"$ref": "#/$defs/non_empty_string"},
+        "rationale": {"$ref": "#/$defs/non_empty_string"},
+        "uses_cross_lane_facts": {"type": "boolean"},
+        "cross_lane_refs": {"type": "array", "items": {"$ref": "#/$defs/cross_lane_reference"}},
+        "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/evidence_ref"}}
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "detail", "raised_at"],
+      "properties": {
+        "kind": {"enum": ["missing_context", "stale_context", "conflict", "needs_platform_state", "needs_human", "capability"]},
+        "detail": {"$ref": "#/$defs/non_empty_string"},
+        "raised_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/evidence_ref"}}
+      }
+    },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "mutation_risk", "requires_fresh_platform_read", "freshness_checked"],
+      "properties": {
+        "summary": {"$ref": "#/$defs/non_empty_string"},
+        "mutation_risk": {"enum": ["none", "local", "external"]},
+        "requires_fresh_platform_read": {"type": "boolean"},
+        "freshness_checked": {"type": "boolean"},
+        "freshness_evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/evidence_ref"}}
+      }
+    },
+    "cross_lane_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_lane", "reason", "evidence_refs", "confidence"],
+      "properties": {
+        "source_lane": {"$ref": "#/$defs/lane_ref"},
+        "reason": {"$ref": "#/$defs/non_empty_string"},
+        "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/evidence_ref"}, "minItems": 1},
+        "confidence": {"enum": ["low", "medium", "high"]}
+      }
+    }
+  }
+}

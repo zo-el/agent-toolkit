@@ -1,0 +1,10 @@
+{
+  "slot": "B1",
+  "exit_status": 1,
+  "timed_out": false,
+  "source_sha": "b7011ad5993f705b538009008bb079fdfedcd753",
+  "fixture_revision": "deterministic-fixture",
+  "stdout": "",
+  "stderr": "Error: Input must be provided either through stdin or as a prompt argument when using --print\n",
+  "parse_error": "JSONDecodeError('Expecting value: line 1 column 1 (char 0)')"
+}

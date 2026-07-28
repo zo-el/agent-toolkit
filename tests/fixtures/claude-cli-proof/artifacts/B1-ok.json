@@ -1,0 +1,19 @@
+{
+  "exit_status": 0,
+  "timed_out": false,
+  "metrics": {"input_tokens": 100, "output_tokens": 50, "turns": 1, "tool_calls": 2, "elapsed_ms": 1000},
+  "result": {
+    "slot": "B1",
+    "session_id": "sess-b1",
+    "scenarios": ["single_lane", "final_output_quality"],
+    "selected_context": ["pl_2", "cap_2", "f2", "e2"],
+    "excluded_context": ["pl_1", "cap_1", "cap_1.f1", "pl_3", "cap_3", "cap_3.f3"],
+    "decisions": [{"statement": "lane #2 waits for baseline proof"}],
+    "provenance": [{"ref": "cap_2.f2"}],
+    "blocks": [],
+    "recovery_view": {},
+    "fallback": {},
+    "oracle_self_check": {"passed": true},
+    "summary": "Selected only lane #2 context."
+  }
+}

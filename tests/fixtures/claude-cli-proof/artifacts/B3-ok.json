@@ -1,0 +1,19 @@
+{
+  "exit_status": 0,
+  "timed_out": false,
+  "metrics": {"input_tokens": 100, "output_tokens": 50, "turns": 1, "tool_calls": 2, "elapsed_ms": 1000},
+  "result": {
+    "slot": "B3",
+    "session_id": "sess-b3",
+    "scenarios": ["related_lanes", "conflicting_assumptions"],
+    "selected_context": ["pl_2", "cap_2", "cap_1.f1"],
+    "excluded_context": ["cap_3"],
+    "decisions": [{"statement": "Related lane #1 fact cap_1.f1 conflicts with lane #2 assumption."}],
+    "provenance": [{"ref": "cap_1.f1"}, {"ref": "cap_2"}],
+    "blocks": [{"reason": "conflicting assumptions require visible blocker before acting"}],
+    "recovery_view": {},
+    "fallback": {},
+    "oracle_self_check": {"passed": true},
+    "summary": "Cited cap_1.f1 as relevant cross-lane provenance and surfaced the conflict."
+  }
+}

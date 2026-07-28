@@ -1,0 +1,36 @@
+{
+  "created_at": "2026-07-28T14:09:23Z",
+  "max_invocations": 10,
+  "source_sha": "b7011ad5993f705b538009008bb079fdfedcd753",
+  "fixture_revision": "96ea48ed3bd57fcf801d6631a6314b6be9a47ebb3b8f908a700545a6ed0a51c2",
+  "launch_controls": {
+    "neutral_cwd": "/home/zachariah/Documents/el-zachariah/repos/agent-toolkit/tests/fixtures/claude-cli-proof",
+    "timeout_seconds": 120,
+    "max_invocations": 10,
+    "no_retry": true,
+    "strict_empty_mcp": true,
+    "read_only_tools": [
+      "Read"
+    ],
+    "plan_permission_mode": true,
+    "project_setting_sources": true,
+    "source_sha": "b7011ad5993f705b538009008bb079fdfedcd753",
+    "fixture_revision": "96ea48ed3bd57fcf801d6631a6314b6be9a47ebb3b8f908a700545a6ed0a51c2",
+    "next_slot_requires_ledger_state": true,
+    "actual_resume_slots": {
+      "B5": "B4",
+      "C5": "C4"
+    }
+  },
+  "invocations": [
+    {
+      "slot": "B1",
+      "artifact": "artifacts/B1-failed-argv.json",
+      "started_at": "2026-07-28T14:09:23Z",
+      "ended_at": "2026-07-28T14:09:24Z",
+      "exit_status": 1,
+      "timed_out": false,
+      "command_digest": "sample"
+    }
+  ]
+}

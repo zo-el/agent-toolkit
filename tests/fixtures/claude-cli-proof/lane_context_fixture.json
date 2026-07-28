@@ -1,0 +1,25 @@
+{
+  "platform_state": {
+    "source": "simulated_task_tools_snapshot_v1",
+    "task_tools_available": true,
+    "source_revision": "platform-rev-2026-07-28T09:00:00-05:00",
+    "lanes": [
+      {"platform_task_id": "pt_release_a", "platform_lane_id": "pl_1", "lane_number": 1, "lane_subject": "#1 Verify Claude CLI proof gate", "status": "running", "owner": "el-zachariah", "dependencies": [], "updated_at": "2026-07-28T09:00:00-05:00"},
+      {"platform_task_id": "pt_release_a", "platform_lane_id": "pl_2", "lane_number": 2, "lane_subject": "#2 Build context capsule schema", "status": "blocked", "owner": "developer", "dependencies": ["pl_1"], "updated_at": "2026-07-28T09:00:00-05:00"},
+      {"platform_task_id": "pt_release_a", "platform_lane_id": "pl_3", "lane_number": 3, "lane_subject": "#3 Review release gate evidence", "status": "todo", "owner": "el-micaiah", "dependencies": ["pl_2"], "updated_at": "2026-07-28T09:00:00-05:00"}
+    ]
+  },
+  "capsules": [
+    {"capsule_id": "cap_1", "platform_task_id": "pt_release_a", "platform_lane_id": "pl_1", "lane_number": 1, "lane_subject": "#1 Verify Claude CLI proof gate", "lane_local_facts": [{"id": "f1", "text": "B1-B5 baseline must finish before source edits", "source": "issue-44", "source_revision": "b7011ad5993f705b538009008bb079fdfedcd753"}], "assumptions": [{"id": "a1", "text": "Claude CLI remains authenticated through Max subscription", "freshness_checked": true}], "evidence": [{"id": "e1", "kind": "command", "ref": "claude --version", "summary": "2.1.220 observed"}], "decisions": [{"id": "d1", "text": "Do not edit source until baseline evidence is preserved", "uses": ["f1", "e1"]}], "blockers": [], "recovery_notes": ["resume should read platform state first"], "next_proposed_action": "Run compact baseline slot B1"},
+    {"capsule_id": "cap_2", "platform_task_id": "pt_release_a", "platform_lane_id": "pl_2", "lane_number": 2, "lane_subject": "#2 Build context capsule schema", "lane_local_facts": [{"id": "f2", "text": "Schema must reject supplemental owner/status/dependency override", "source": "issue-44", "source_revision": "b7011ad5993f705b538009008bb079fdfedcd753"}], "assumptions": [{"id": "a2", "text": "Task tools are present for this scenario", "freshness_checked": true}], "evidence": [{"id": "e2", "kind": "fixture", "ref": "negative_override", "summary": "override attempt exists"}], "decisions": [], "blockers": [{"id": "b2", "reason": "waiting for baseline proof", "visible": true}], "recovery_notes": ["status/owner/dependencies come from platform_state only"], "next_proposed_action": "Implement after baseline"},
+    {"capsule_id": "cap_3", "platform_task_id": "pt_release_a", "platform_lane_id": "pl_3", "lane_number": 3, "lane_subject": "#3 Review release gate evidence", "lane_local_facts": [{"id": "f3", "text": "Micaiah must review local diff and proof packet before dogfood", "source": "issue-45", "source_revision": "b7011ad5993f705b538009008bb079fdfedcd753"}], "assumptions": [{"id": "a3", "text": "Review can occur after tests and C1-C5 are readable", "freshness_checked": true}], "evidence": [{"id": "e3", "kind": "kanban", "ref": "t_65402084", "summary": "Envelope review approved"}], "decisions": [], "blockers": [], "recovery_notes": ["review verdict is supplemental evidence, not lane status truth"], "next_proposed_action": "Wait for implementation evidence"}
+  ],
+  "negative_records": {
+    "supplemental_override": {"capsule_id": "bad_override", "platform_lane_id": "pl_2", "supplemental_status": "done", "supplemental_owner": "attacker", "supplemental_dependencies": []},
+    "custom_ledger_only_recovery": {"ledger_lane_id": "local_only_2", "claims_platform_persisted": false, "task_tools_available": true},
+    "fallback_masquerade": {"fallback_reason": "task_tools_absent", "reduced_fidelity": true, "non_platform_persisted": false, "claims_platform_lane_id": "pl_fake"},
+    "stale_action": {"capsule_id": "stale_cap", "platform_lane_id": "pl_2", "source_revision": "old-rev", "freshness_checked": false, "proposed_mutation": "mark_done"},
+    "conflict_without_blocker": {"lane_a_assumption": "budget allows exactly ten invocations", "lane_b_assumption": "rerun failed slots until green", "visible_blocker": false}
+  },
+  "fallback_record": {"fallback_lane_id": "fb_1", "fallback_reason": "task_tools_absent", "reduced_fidelity": true, "non_platform_persisted": true, "lane_subject": "#9 Offline fallback lane"}
+}

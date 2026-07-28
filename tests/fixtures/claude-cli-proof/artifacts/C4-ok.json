@@ -1,0 +1,19 @@
+{
+  "exit_status": 0,
+  "timed_out": false,
+  "metrics": {"input_tokens": 130, "output_tokens": 62, "turns": 1, "tool_calls": 2, "elapsed_ms": 1200},
+  "result": {
+    "slot": "C4",
+    "session_id": "sess-c4",
+    "scenarios": ["stale_context", "task_tools_absent_fallback", "resume_seed"],
+    "selected_context": ["fallback_record", "negative_records.stale_action"],
+    "excluded_context": ["cap_1", "cap_2", "cap_3"],
+    "decisions": [{"statement": "Do not treat non-platform persisted fallback as canonical truth."}],
+    "provenance": [{"ref": "fallback_record"}],
+    "blocks": [{"reason": "task_tools_absent fallback is reduced_fidelity and non_platform_persisted"}],
+    "recovery_view": {},
+    "fallback": {"fallback_reason": "task_tools_absent", "reduced_fidelity": true, "non_platform_persisted": true},
+    "oracle_self_check": {"passed": true},
+    "summary": "Recorded fallback labels and session handle for the resume seed."
+  }
+}
