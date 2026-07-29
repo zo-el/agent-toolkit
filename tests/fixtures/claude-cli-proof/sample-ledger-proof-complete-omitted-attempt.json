@@ -180,15 +180,7 @@
       "exit_status": 0,
       "timed_out": false,
       "budget_capped": false
-    },
-    {
-      "attempt_index": 10,
-      "slot": "C5",
-      "artifact": "artifacts/C5-ok.json",
-      "exit_status": 0,
-      "timed_out": false,
-      "budget_capped": false
     }
   ],
-  "append_only_attempts_digest": "1d808cc68fb5885044689050904af66409ed4288d5da6e8daf0fbfbc60f4c5ba"
+  "append_only_attempts_digest": "a74592917a378077092a8497817df8b650a56e4e54ef8d435ce9dfa8f6e92e3a"
 }

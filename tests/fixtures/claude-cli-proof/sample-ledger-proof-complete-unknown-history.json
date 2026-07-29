@@ -190,5 +190,11 @@
       "budget_capped": false
     }
   ],
-  "append_only_attempts_digest": "1d808cc68fb5885044689050904af66409ed4288d5da6e8daf0fbfbc60f4c5ba"
+  "append_only_attempts_digest": "1d808cc68fb5885044689050904af66409ed4288d5da6e8daf0fbfbc60f4c5ba",
+  "omitted_invocations": [
+    {
+      "slot": "B0",
+      "exit_status": 1
+    }
+  ]
 }

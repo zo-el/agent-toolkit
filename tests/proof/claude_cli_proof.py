@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import statistics
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -62,6 +63,38 @@ REQUIRED_BEHAVIORS = {
 METRIC_KEYS = ("input_tokens", "output_tokens", "turns", "tool_calls", "elapsed_ms")
 MAX_BUDGET_USD = "0.25"
 ACTUAL_RESUME_PREDECESSOR = {"B5": "B4", "C5": "C4"}
+REVIEWED_HEAD_TOKEN = "<reviewed-head-sha>"
+FIXTURE_DIR_TOKEN = "<fixture-dir>"
+ALLOWED_LEDGER_KEYS = {
+    "created_at",
+    "max_invocations",
+    "source_sha",
+    "fixture_revision",
+    "launch_controls",
+    "invocations",
+    "append_only_attempts",
+    "append_only_attempts_digest",
+}
+ALLOWED_INVOCATION_KEYS = {
+    "slot",
+    "artifact",
+    "started_at",
+    "ended_at",
+    "exit_status",
+    "timed_out",
+    "budget_capped",
+    "command_digest",
+    "resume_from_session_id",
+    "command",
+}
+ALLOWED_ATTEMPT_KEYS = {
+    "attempt_index",
+    "slot",
+    "artifact",
+    "exit_status",
+    "timed_out",
+    "budget_capped",
+}
 
 
 class ProofError(Exception):
@@ -88,22 +121,51 @@ def fixture_dir(raw: str | None) -> Path:
     return Path(raw).resolve() if raw else DEFAULT_FIXTURE_DIR
 
 
+def git_head_sha() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip()
+    except Exception as exc:  # noqa: BLE001 - surface deterministic proof context
+        raise ProofError(f"cannot resolve reviewed head SHA from git: {exc}") from exc
+
+
+def resolve_fixture_value(value: Any, path: Path) -> Any:
+    if value == REVIEWED_HEAD_TOKEN:
+        return git_head_sha()
+    if value == FIXTURE_DIR_TOKEN:
+        return str(path)
+    if isinstance(value, list):
+        return [resolve_fixture_value(item, path) for item in value]
+    if isinstance(value, dict):
+        return {key: resolve_fixture_value(item, path) for key, item in value.items()}
+    return value
+
+
+def fixture_revision_payload(manifest: dict[str, Any], lanes: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    revision_manifest = json.loads(json.dumps(manifest))
+    launch = revision_manifest.get("launch_controls", {})
+    if isinstance(launch, dict):
+        launch.pop("fixture_revision", None)
+    return {"manifest": revision_manifest, "lanes": lanes, "schema": schema}
+
+
 def validate_fixtures(path: Path) -> dict[str, Any]:
     manifest = load_json(path / "scenario_manifest.json")
     lanes = load_json(path / "lane_context_fixture.json")
     schema = load_json(path / "claude_output_schema.json")
     empty_mcp = load_json(path / "empty-mcp.json")
-    revision_manifest = json.loads(json.dumps(manifest))
-    revision_manifest.get("launch_controls", {}).pop("fixture_revision", None)
-    revision = stable_digest({"manifest": revision_manifest, "lanes": lanes, "schema": schema})
+    revision = stable_digest(fixture_revision_payload(manifest, lanes, schema))
+    resolved_source_sha = resolve_fixture_value(manifest.get("source_sha"), path)
 
     require(empty_mcp == {"mcpServers": {}}, "empty-mcp.json must prove strict empty MCP")
     require(manifest.get("source_sha"), "manifest must pin source_sha for launch control")
+    require(manifest.get("source_sha") != "b7011ad5993f705b538009008bb079fdfedcd753", "manifest source_sha must not pin the PR base SHA")
     require(manifest.get("max_invocations") == MAX_INVOCATIONS, "manifest must cap invocations at 10")
     require(manifest.get("required_controls") and REQUIRED_CONTROLS <= set(manifest["required_controls"]), "manifest missing required CLI safety/resource controls")
     launch = manifest.get("launch_controls", {})
     require(REQUIRED_LAUNCH_CONTROLS <= set(launch), f"manifest missing launch controls: {sorted(REQUIRED_LAUNCH_CONTROLS - set(launch))}")
-    require(launch.get("neutral_cwd") == str(path), "launch control must force neutral fixture-only cwd")
+    require(launch.get("neutral_cwd") == FIXTURE_DIR_TOKEN, "committed launch control neutral_cwd must stay portable")
+    resolved_launch = resolve_fixture_value(launch, path)
+    require(resolved_launch.get("neutral_cwd") == str(path), "launch control must force neutral fixture-only cwd")
     require(launch.get("timeout_seconds") == TIMEOUT_SECONDS, "launch control must pin 120s timeout")
     require(launch.get("max_invocations") == MAX_INVOCATIONS, "launch control must cap ten-slot envelope")
     require(launch.get("no_retry") is True, "launch control must refuse retries")
@@ -111,7 +173,7 @@ def validate_fixtures(path: Path) -> dict[str, Any]:
     require(launch.get("read_only_tools") == ["Read"], "launch control must restrict tools to Read")
     require(launch.get("plan_permission_mode") is True, "launch control must use plan permission mode")
     require(launch.get("project_setting_sources") is True, "launch control must use project setting sources only")
-    require(launch.get("source_sha") == manifest.get("source_sha"), "launch source_sha must match manifest source_sha")
+    require(resolve_fixture_value(launch.get("source_sha"), path) == resolved_source_sha, "launch source_sha must match manifest source_sha")
     require(launch.get("fixture_revision") == revision, "launch fixture_revision must match deterministic fixture digest")
     require(launch.get("next_slot_requires_ledger_state") is True, "launch control must require ledger state before each next slot")
     require(launch.get("actual_resume_slots") == ACTUAL_RESUME_PREDECESSOR, "launch control must encode B5/C5 actual-resume predecessors")
@@ -162,7 +224,7 @@ def validate_fixtures(path: Path) -> dict[str, Any]:
 
     prompt_slots = {p.stem.removeprefix("prompt_") for p in path.glob("prompt_*.txt")}
     require({f"B{i}" for i in range(1, 6)} | {f"C{i}" for i in range(1, 6)} <= prompt_slots, "missing B/C prompt templates")
-    return {"fixture_dir": str(path), "source_sha": manifest["source_sha"], "fixture_revision": revision, "covered": sorted(covered)}
+    return {"fixture_dir": str(path), "source_sha": resolved_source_sha, "fixture_revision": revision, "covered": sorted(covered)}
 
 
 def launch_controls(path: Path) -> dict[str, Any]:
@@ -295,24 +357,74 @@ def has_failed_slot_evidence(artifact: dict[str, Any]) -> bool:
     return False
 
 
+def require_known_keys(mapping: dict[str, Any], allowed: set[str], context: str) -> None:
+    unknown = sorted(set(mapping) - allowed)
+    require(not unknown, f"{context}: unknown fields are not allowed: {unknown}")
+
+
+def normalize_record_value(value: Any, fixtures: Path) -> Any:
+    return resolve_fixture_value(value, fixtures)
+
+
+def validate_attempt_history(ledger: dict[str, Any], invocations: list[dict[str, Any]], fixtures: Path, *, require_complete: bool) -> None:
+    attempts = ledger.get("append_only_attempts")
+    digest = ledger.get("append_only_attempts_digest")
+    if require_complete:
+        require(isinstance(attempts, list), "proof-complete ledger must include append_only_attempts")
+        require(isinstance(digest, str) and bool(digest), "proof-complete ledger must include append_only_attempts_digest")
+    if attempts is None:
+        return
+    require(isinstance(attempts, list), "append_only_attempts must be a list")
+    require(digest == stable_digest(attempts), "append_only_attempts_digest must match the full append-only attempt history")
+    if require_complete:
+        require(len(attempts) == MAX_INVOCATIONS, "proof-complete ledger must preserve exactly ten append-only attempts")
+        require(len(invocations) == MAX_INVOCATIONS, "proof-complete ledger must list exactly ten successful invocation records")
+
+    seen_indexes: list[int] = []
+    for idx, attempt in enumerate(attempts, start=1):
+        require(isinstance(attempt, dict), f"attempt {idx}: must be an object")
+        require_known_keys(attempt, ALLOWED_ATTEMPT_KEYS, f"attempt {idx}")
+        require(attempt.get("attempt_index") == idx, f"attempt {idx}: attempt_index must be append-only and gapless")
+        seen_indexes.append(idx)
+        if require_complete:
+            require(attempt.get("exit_status") == 0, f"attempt {idx}: nonzero exit keeps proof incomplete")
+            require(attempt.get("timed_out") is False, f"attempt {idx}: timeout keeps proof incomplete")
+            require(attempt.get("budget_capped") in (False, None), f"attempt {idx}: budget cap keeps proof incomplete")
+
+    if require_complete:
+        for idx, invocation in enumerate(invocations, start=1):
+            attempt = attempts[idx - 1]
+            for key in ("slot", "artifact", "exit_status", "timed_out"):
+                require(normalize_record_value(attempt.get(key), fixtures) == normalize_record_value(invocation.get(key), fixtures), f"attempt {idx}: {key} must match invocation history")
+            require(bool(normalize_record_value(attempt.get("budget_capped", False), fixtures)) == bool(normalize_record_value(invocation.get("budget_capped", False), fixtures)), f"attempt {idx}: budget_capped must match invocation history")
+
+
 def validate_ledger(path: Path, fixtures: Path = DEFAULT_FIXTURE_DIR) -> dict[str, Any]:
     ledger = load_json(path)
     invocations = ledger.get("invocations", [])
     expected_controls = launch_controls(fixtures)
+    require(isinstance(ledger, dict), "ledger must be an object")
+    require_known_keys(ledger, ALLOWED_LEDGER_KEYS, "ledger")
+    require(isinstance(invocations, list), "ledger invocations must be a list")
     require(ledger.get("max_invocations") == MAX_INVOCATIONS, "ledger must record ten-slot max_invocations")
     require(len(invocations) <= MAX_INVOCATIONS, "ledger exceeds ten-slot envelope")
-    require(ledger.get("source_sha") == expected_controls["source_sha"], "ledger source_sha must match approved fixture source_sha")
+    require(resolve_fixture_value(ledger.get("source_sha"), fixtures) == expected_controls["source_sha"], "ledger source_sha must match approved fixture source_sha")
+    require(ledger.get("source_sha") != "b7011ad5993f705b538009008bb079fdfedcd753", "ledger source_sha must not pin the PR base SHA")
     require(ledger.get("fixture_revision") == expected_controls["fixture_revision"], "ledger fixture_revision must match approved fixture revision")
     launch = ledger.get("launch_controls", {})
+    require(isinstance(launch, dict), "ledger launch_controls must be an object")
+    require_known_keys(launch, REQUIRED_LAUNCH_CONTROLS, "ledger launch_controls")
     require(REQUIRED_LAUNCH_CONTROLS <= set(launch), f"ledger missing launch controls: {sorted(REQUIRED_LAUNCH_CONTROLS - set(launch))}")
     for key, expected in expected_controls.items():
-        require(launch.get(key) == expected, f"ledger launch control {key} must match approved fixture control")
+        require(resolve_fixture_value(launch.get(key), fixtures) == expected, f"ledger launch control {key} must match approved fixture control")
 
     successes: dict[str, dict[str, Any]] = {}
     session_ids: dict[str, str] = {}
     failures: list[str] = []
     artifact_root = path.parent
     for idx, item in enumerate(invocations):
+        require(isinstance(item, dict), f"invocation {idx}: must be an object")
+        require_known_keys(item, ALLOWED_INVOCATION_KEYS, f"invocation {idx}")
         slot = item.get("slot")
         require(slot in {f"B{i}" for i in range(1, 6)} | {f"C{i}" for i in range(1, 6)}, f"invocation {idx}: bad slot {slot}")
         artifact_path = Path(item.get("artifact", ""))
@@ -349,6 +461,9 @@ def validate_ledger(path: Path, fixtures: Path = DEFAULT_FIXTURE_DIR) -> dict[st
 
 def validate_proof_complete(path: Path, fixtures: Path = DEFAULT_FIXTURE_DIR) -> dict[str, Any]:
     """Validate that a ledger is complete release proof, not merely preserved evidence."""
+    ledger = load_json(path)
+    invocations = ledger.get("invocations", []) if isinstance(ledger, dict) else []
+    validate_attempt_history(ledger, invocations, fixtures, require_complete=True)
     result = validate_ledger(path, fixtures)
     successes = set(result["successes"])
     failures = result["failed_evidence_slots"]
