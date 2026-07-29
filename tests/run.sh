@@ -97,10 +97,11 @@ proof_case matched-pair-comparison python3 "$root/tests/proof/claude_cli_proof.p
 proof_case actual-resume-ledger python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-actual-resume.json"
 proof_case regression-recorded python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-regression.json"
 proof_fail_case evidence-not-complete python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-failed-slot.json"
-proof_case proof-complete-ledger python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete.json"
+proof_fail_case legacy-proof-complete-informal python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete.json"
 proof_fail_case omitted-attempt-history python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete-omitted-attempt.json"
 proof_fail_case unknown-attempt-history python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete-unknown-history.json"
 proof_fail_case unsafe-launch-controls python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-unsafe-launch-controls.json"
+proof_case immutable-runner-contract python3 "$root/tests/proof/claude_cli_proof.py" validate-runner-contract
 
 # ── guard-git: deny — public words as the user, never allowed ──
 bash_case deny 'gh pr comment 5 --body "looks good"'
