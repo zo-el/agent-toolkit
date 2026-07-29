@@ -185,6 +185,21 @@ def append_journal_event(journal: Path, event: dict[str, Any]) -> dict[str, Any]
     return row
 
 
+def rewrite_journal_hash_chain(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Rewrite rows with a valid seq/prev/event hash chain for deterministic tamper tests."""
+    rewritten = []
+    prev_hash = "0" * 64
+    for seq, row in enumerate(rows, start=1):
+        payload = dict(row)
+        payload.pop("event_hash", None)
+        payload["seq"] = seq
+        payload["prev_hash"] = prev_hash
+        event_hash = stable_digest(payload)
+        rewritten.append({**payload, "event_hash": event_hash})
+        prev_hash = event_hash
+    path.write_text("\n".join(json.dumps(row, sort_keys=True, separators=(",", ":")) for row in rewritten) + "\n", encoding="utf-8")
+
+
 def validate_journal_hash_chain(path: Path) -> list[dict[str, Any]]:
     rows = read_jsonl(path)
     prev = "0" * 64
@@ -209,6 +224,8 @@ def safe_preflight_metadata(raw: dict[str, Any] | None) -> dict[str, Any]:
     metadata.setdefault("provider", "claude-cli")
     metadata.setdefault("checked_before_first_invocation", True)
     metadata.setdefault("secrets_stored", False)
+    require(metadata.get("checked_before_first_invocation") is True, "preflight metadata must be captured before first invocation")
+    require(metadata.get("secrets_stored") is False, "preflight metadata must not store secrets")
     return metadata
 
 
@@ -234,6 +251,20 @@ def command_shape(argv: list[str]) -> list[str]:
         else:
             shaped.append(item)
     return shaped
+
+
+def command_digest_from_argv(argv: list[str]) -> str:
+    digest_argv: list[str] = []
+    skip_next = False
+    for item in argv:
+        if skip_next:
+            digest_argv.append("<json-schema>")
+            skip_next = False
+            continue
+        digest_argv.append(item)
+        if item == "--json-schema":
+            skip_next = True
+    return hashlib.sha256(json.dumps(digest_argv, separators=(",", ":")).encode()).hexdigest()
 
 
 def control_manifest(path: Path, claude: Path) -> dict[str, Any]:
@@ -287,18 +318,26 @@ def budget_capped_from_explicit_evidence(exit_status: int | None, timed_out: boo
 
 
 def assert_no_pending_start(rows: list[dict[str, Any]]) -> None:
-    open_starts: dict[str, int] = {}
+    expected_index = 0
+    active_slot: str | None = None
     for row in rows:
         event = row.get("event")
         slot = row.get("slot")
         require(isinstance(slot, str), f"journal row {row.get('seq')}: slot must be a string")
         if event == "invocation_start":
-            require(slot not in open_starts, f"{slot}: duplicate/pending invocation start")
-            open_starts[slot] = row["seq"]
+            require(active_slot is None, f"{slot}: overlapping invocation start before completing {active_slot}")
+            require(expected_index < len(EXPECTED_SLOT_ORDER), f"{slot}: start exceeds ten-slot envelope")
+            require(slot == EXPECTED_SLOT_ORDER[expected_index], f"{slot}: start is not next fixed slot {EXPECTED_SLOT_ORDER[expected_index]}")
+            active_slot = slot
         elif event == "invocation_complete":
-            require(slot in open_starts, f"{slot}: completion without start")
-            open_starts.pop(slot)
-    require(not open_starts, f"pending invocation start without completion: {sorted(open_starts)}")
+            require(active_slot == slot, f"{slot}: completion without matching active start")
+            expected_index += 1
+            active_slot = None
+        elif event == "correction":
+            continue
+        else:
+            raise ProofError(f"journal row {row.get('seq')}: unsupported event {event}")
+    require(active_slot is None, f"pending invocation start without completion: {active_slot}")
 
 
 def validate_strict_packet(path: Path, fixtures: Path) -> dict[str, Any]:
@@ -338,8 +377,17 @@ def validate_strict_packet(path: Path, fixtures: Path) -> dict[str, Any]:
 
     invocations = ledger.get("invocations", [])
     require([item.get("slot") for item in invocations] == EXPECTED_SLOT_ORDER, "strict proof ledger invocations must match fixed order")
+    starts_by_slot = {row["slot"]: row for row in starts}
+    completes_by_slot = {row["slot"]: row for row in completes}
     for item in invocations:
         slot = item["slot"]
+        command = item.get("command", {})
+        require(isinstance(command, dict), f"{slot}: ledger command must be recorded")
+        argv = command.get("argv", [])
+        require(isinstance(argv, list) and all(isinstance(arg, str) for arg in argv), f"{slot}: command argv must be recorded as strings")
+        require(command_shape(argv) == manifest.get("claude_command_shapes", {}).get(slot), f"{slot}: command shape drift from immutable control manifest")
+        require(item.get("command_digest") == command_digest_from_argv(argv), f"{slot}: command_digest does not match recorded argv")
+        require(starts_by_slot[slot].get("command_digest") == item.get("command_digest"), f"{slot}: journal start command_digest does not match ledger")
         artifact_path = packet / item["artifact"]
         require(artifact_path.exists(), f"{slot}: normalized artifact missing")
         require(file_digest(artifact_path) == item.get("artifact_digest"), f"{slot}: normalized artifact digest mismatch")
@@ -351,6 +399,7 @@ def validate_strict_packet(path: Path, fixtures: Path) -> dict[str, Any]:
             raw_path = raw_dir / name
             require(raw_path.exists(), f"{slot}: raw evidence missing {name}")
             require(file_digest(raw_path) == digest, f"{slot}: raw evidence mutated: {name}")
+        require(completes_by_slot[slot].get("artifact_digest") == item.get("artifact_digest"), f"{slot}: journal completion artifact_digest does not match ledger")
     return {"strict_release_proof": True, "journal_events": len(rows), "control_manifest": ledger["control_manifest"]}
 
 
@@ -618,6 +667,7 @@ def run_packet(packet: Path, fixtures: Path, claude: Path, preflight: dict[str, 
         manifest = load_packet_sidecar(packet, ledger["control_manifest"], control_hash, "control manifest")
         current_preflight = load_packet_sidecar(packet, ledger["preflight"], preflight_hash, "first preflight")
         require(current_preflight.get("checked_before_first_invocation") is True, "preflight was overwritten or was not first-call metadata")
+        require(current_preflight.get("secrets_stored") is False, "preflight stores secrets; refusing to spawn")
         require(manifest.get("source_head") == git_head_sha(), "source drift before invocation")
         require(manifest.get("runner_code_digest") == file_digest(Path(__file__).resolve()), "runner/evaluator drift before invocation")
         require(manifest.get("fixture_file_digests") == fixture_file_digests(fixtures), "fixture drift before invocation")
@@ -965,10 +1015,15 @@ def expect_proof_error(label: str, fn: Any) -> None:
 def write_fake_claude(path: Path) -> None:
     script = r'''#!/usr/bin/env python3
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
+marker = os.environ.get("FAKE_CLAUDE_MARKER")
+if marker:
+    with open(marker, "a", encoding="utf-8") as handle:
+        handle.write("spawned\n")
 prompt = sys.stdin.read()
 match = re.search(r"fixture ([BC][1-5])", prompt)
 slot = match.group(1) if match else "B1"
@@ -1018,6 +1073,41 @@ def validate_runner_contract() -> dict[str, Any]:
         append_journal_event(partial / "events.jsonl", {"event": "invocation_start", "slot": "B4", "source_head": git_head_sha(), "control_manifest_digest": load_json(partial / "ledger.json")["control_manifest_digest"], "preflight_digest": load_json(partial / "ledger.json")["preflight_digest"], "command_digest": "pending", "timeout_seconds": TIMEOUT_SECONDS, "budget_usd": MAX_BUDGET_USD})
         expect_proof_error("pending-start recovery", lambda: run_packet(partial, DEFAULT_FIXTURE_DIR, fake))
         cases.append("pending-start recovery")
+
+        overlap = root / "overlap"
+        run_packet(overlap, DEFAULT_FIXTURE_DIR, fake)
+        rows = read_jsonl(overlap / "events.jsonl")
+        rows = [rows[0], rows[2], rows[1], *rows[3:]]
+        rewrite_journal_hash_chain(overlap / "events.jsonl", rows)
+        expect_proof_error("overlapping/all-starts-before-completions event order", lambda: validate_proof_complete(overlap / "ledger.json"))
+        cases.append("overlapping start-complete order")
+
+        command_drift = root / "command-drift"
+        run_packet(command_drift, DEFAULT_FIXTURE_DIR, fake)
+        ledger = load_json(command_drift / "ledger.json")
+        ledger["invocations"][0]["command"]["argv"][0] = "/tmp/unreviewed-claude"
+        drift_digest = command_digest_from_argv(ledger["invocations"][0]["command"]["argv"])
+        ledger["invocations"][0]["command_digest"] = drift_digest
+        rows = read_jsonl(command_drift / "events.jsonl")
+        rows[0]["command_digest"] = drift_digest
+        rewrite_journal_hash_chain(command_drift / "events.jsonl", rows)
+        (command_drift / "ledger.json").write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        expect_proof_error("bad command digest and argv", lambda: validate_proof_complete(command_drift / "ledger.json"))
+        cases.append("command bound to immutable control manifest")
+
+        invalid_preflight = root / "invalid-preflight"
+        marker = root / "invalid-preflight-spawned.txt"
+        previous_marker = os.environ.get("FAKE_CLAUDE_MARKER")
+        os.environ["FAKE_CLAUDE_MARKER"] = str(marker)
+        try:
+            expect_proof_error("invalid preflight metadata before spawn", lambda: run_packet(invalid_preflight, DEFAULT_FIXTURE_DIR, fake, {"provider": "fake-claude", "checked_before_first_invocation": True, "secrets_stored": True}))
+        finally:
+            if previous_marker is None:
+                os.environ.pop("FAKE_CLAUDE_MARKER", None)
+            else:
+                os.environ["FAKE_CLAUDE_MARKER"] = previous_marker
+        require(not marker.exists(), "invalid preflight metadata must fail before spawning fake Claude")
+        cases.append("invalid preflight fail-before-spawn")
 
         missing_preflight = root / "missing-preflight"
         run_packet(missing_preflight, DEFAULT_FIXTURE_DIR, fake)
