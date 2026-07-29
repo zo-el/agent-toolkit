@@ -300,6 +300,13 @@ def selected_blob(out: dict[str, Any]) -> str:
     return json.dumps(fields, sort_keys=True)
 
 
+def oracle_self_check_passed(oracle: dict[str, Any]) -> bool:
+    """Validate the oracle self-check contract using only explicit pass markers."""
+    if oracle.get("passed") is False or oracle.get("match") is False:
+        return False
+    return oracle.get("passed") is True or oracle.get("match") is True
+
+
 def validate_success_output(slot: str, result: dict[str, Any]) -> None:
     base = "B" + slot[1] if slot.startswith("C") else slot
     require(result.get("slot") == slot, f"{slot}: result slot mismatch")
@@ -307,11 +314,7 @@ def validate_success_output(slot: str, result: dict[str, Any]) -> None:
         require(isinstance(result.get(key), list), f"{slot}: {key} must be a list")
     require(isinstance(result.get("oracle_self_check"), dict), f"{slot}: missing oracle_self_check object")
     oracle = result["oracle_self_check"]
-    oracle_passed = oracle.get("passed") is True or oracle.get("match") is True
-    if not oracle_passed:
-        scalar_values = [value for value in oracle.values() if isinstance(value, (str, bool))]
-        oracle_passed = bool(scalar_values) and all(value is True or "satisfied" in str(value).lower() for value in scalar_values)
-    require(oracle_passed, f"{slot}: oracle_self_check must report passed/match true or satisfied scalar checks")
+    require(oracle_self_check_passed(oracle), f"{slot}: oracle_self_check must report explicit passed/match true")
     blob = selected_blob(result)
     if base == "B1":
         require("cap_2" in blob and "pl_2" in blob, f"{slot}: must select only target lane #2 context")
@@ -519,6 +522,22 @@ def compare_pairs(successes: dict[str, dict[str, Any]]) -> dict[str, Any]:
     return {"pairs": pair_reports, "aggregate_median_ratios": medians}
 
 
+def validate_oracle_contract() -> dict[str, Any]:
+    cases = {
+        "explicit-passed-true": ({"passed": True, "notes": "not authoritative"}, True),
+        "explicit-match-true": ({"match": True, "notes": "not authoritative"}, True),
+        "explicit-passed-false": ({"passed": False, "checks": {"nested": True}}, False),
+        "explicit-match-false": ({"match": False, "checks": {"nested": True}}, False),
+        "explicit-false-overrides-match-true": ({"passed": False, "match": True}, False),
+        "nested-all-true-ambiguous": ({"checks": {"must_select": {"cap_2": True}, "must_exclude": [True, True]}, "notes": "diagnostic only"}, False),
+        "nested-false-ambiguous": ({"overall": True, "checks": {"must_select": True, "must_exclude": {"cap_1": False}}}, False),
+        "metadata-notes-ignored": ({"notes": "all satisfied", "explanation": "satisfied"}, False),
+    }
+    for label, (oracle, expected) in cases.items():
+        require(oracle_self_check_passed(oracle) is expected, f"oracle contract case failed: {label}")
+    return {"oracle_contract_cases": sorted(cases)}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture-dir")
@@ -531,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
     led.add_argument("ledger")
     complete = sub.add_parser("validate-proof-complete")
     complete.add_argument("ledger")
+    sub.add_parser("validate-oracle-contract")
     args = parser.parse_args(argv)
 
     try:
@@ -544,6 +564,8 @@ def main(argv: list[str] | None = None) -> int:
             result = validate_ledger(Path(args.ledger).resolve(), fixtures)
         elif args.cmd == "validate-proof-complete":
             result = validate_proof_complete(Path(args.ledger).resolve(), fixtures)
+        elif args.cmd == "validate-oracle-contract":
+            result = validate_oracle_contract()
         else:  # pragma: no cover
             raise AssertionError(args.cmd)
     except ProofError as exc:

@@ -2,7 +2,7 @@
   "created_at": "2026-07-28T14:09:23Z",
   "max_invocations": 10,
   "source_sha": "<reviewed-head-sha>",
-  "fixture_revision": "12ed5275d2fd908aec8446dca91c9e7a1ac2ef230479c6e630428ee3d486d21b",
+  "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d",
   "launch_controls": {
     "neutral_cwd": "<fixture-dir>",
     "timeout_seconds": 120,
@@ -15,7 +15,7 @@
     "plan_permission_mode": true,
     "project_setting_sources": true,
     "source_sha": "<reviewed-head-sha>",
-    "fixture_revision": "12ed5275d2fd908aec8446dca91c9e7a1ac2ef230479c6e630428ee3d486d21b",
+    "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d",
     "next_slot_requires_ledger_state": true,
     "actual_resume_slots": {
       "B5": "B4",

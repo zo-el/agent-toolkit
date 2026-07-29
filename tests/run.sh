@@ -91,6 +91,7 @@ proof_case stdin-command-shape python3 "$root/tests/proof/claude_cli_proof.py" b
 proof_fail_case resume-required python3 "$root/tests/proof/claude_cli_proof.py" build-command B5
 proof_case resume-command-shape python3 "$root/tests/proof/claude_cli_proof.py" build-command B5 --resume-id sess-b4
 proof_case failed-slot-preserved python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-failed-slot.json"
+proof_case oracle-self-check-contract python3 "$root/tests/proof/claude_cli_proof.py" validate-oracle-contract
 proof_case budget-capped-wrapper python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-budget-capped-wrapper.json"
 proof_case matched-pair-comparison python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-matched-pair.json"
 proof_case actual-resume-ledger python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-actual-resume.json"
