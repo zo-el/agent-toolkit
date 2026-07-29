@@ -340,6 +340,55 @@ def assert_no_pending_start(rows: list[dict[str, Any]]) -> None:
     require(active_slot is None, f"pending invocation start without completion: {active_slot}")
 
 
+def completed_slots_from_journal(rows: list[dict[str, Any]]) -> list[str]:
+    completed: list[str] = []
+    active_slot: str | None = None
+    for row in rows:
+        event = row.get("event")
+        slot = row.get("slot")
+        if event == "invocation_start":
+            require(isinstance(slot, str), f"journal row {row.get('seq')}: slot must be a string")
+            active_slot = slot
+        elif event == "invocation_complete":
+            require(isinstance(slot, str), f"journal row {row.get('seq')}: slot must be a string")
+            require(active_slot == slot, f"{slot}: completion without matching active start")
+            completed.append(slot)
+            active_slot = None
+    return completed
+
+
+def validate_resume_prefix(packet: Path, ledger_path: Path, rows: list[dict[str, Any]]) -> list[str]:
+    """Fail closed before spawn unless mutable ledger exactly mirrors immutable completed evidence."""
+    ledger = load_json(ledger_path)
+    ledger_slots = completed_slots_from_ledger(ledger_path)
+    journal_slots = completed_slots_from_journal(rows)
+    require(ledger_slots == journal_slots, f"resume ledger slots must exactly match immutable journal completed prefix: ledger={ledger_slots} journal={journal_slots}")
+
+    for item in ledger.get("invocations", []):
+        slot = item.get("slot")
+        artifact = item.get("artifact")
+        require(isinstance(slot, str) and isinstance(artifact, str), f"resume invocation missing slot/artifact: {item}")
+        artifact_path = packet / artifact
+        require(artifact_path.exists(), f"{slot}: resume normalized artifact missing")
+        require(file_digest(artifact_path) == item.get("artifact_digest"), f"{slot}: resume normalized artifact digest mismatch")
+        raw_dir = packet / item.get("raw_dir", "")
+        require(raw_dir.is_dir(), f"{slot}: resume raw evidence directory missing")
+        raw_digests = item.get("raw_artifact_digests", {})
+        require(set(raw_digests) == {"stdout.txt", "stderr.txt", "wrapper.json", "exit.json", "timing.json"}, f"{slot}: resume raw evidence manifest incomplete")
+        for name, digest in raw_digests.items():
+            raw_path = raw_dir / name
+            require(raw_path.exists(), f"{slot}: resume raw evidence missing {name}")
+            require(file_digest(raw_path) == digest, f"{slot}: resume raw evidence mutated: {name}")
+
+    if len(ledger_slots) < len(EXPECTED_SLOT_ORDER):
+        next_slot = EXPECTED_SLOT_ORDER[len(ledger_slots)]
+        next_raw_dir = packet / "artifacts" / "raw" / next_slot
+        next_normalized = packet / "artifacts" / "normalized" / f"{next_slot}.json"
+        require(not next_raw_dir.exists(), f"{next_slot}: resume would overwrite existing raw evidence")
+        require(not next_normalized.exists(), f"{next_slot}: resume would overwrite existing normalized evidence")
+    return ledger_slots
+
+
 def validate_strict_packet(path: Path, fixtures: Path) -> dict[str, Any]:
     ledger = load_json(path)
     packet = path.parent
@@ -638,7 +687,7 @@ def run_packet(packet: Path, fixtures: Path, claude: Path, preflight: dict[str, 
             rows = validate_journal_hash_chain(journal)
             assert_no_pending_start(rows)
             control_hash, preflight_hash = existing_packet_hashes(packet)
-            completed = completed_slots_from_ledger(ledger_path)
+            completed = validate_resume_prefix(packet, ledger_path, rows)
         else:
             manifest_path = packet / "control_manifest.json"
             preflight_path = packet / "preflight.json"
@@ -1171,6 +1220,24 @@ def validate_runner_contract() -> dict[str, Any]:
         append_journal_event(correction / "events.jsonl", {"event": "correction", "slot": "B1", "before_digest": "a", "after_digest": "b"})
         expect_proof_error("correction after first call", lambda: validate_proof_complete(correction / "ledger.json"))
         cases.append("correction after first call")
+
+        ledger_behind = root / "ledger-behind-journal"
+        run_packet(ledger_behind, DEFAULT_FIXTURE_DIR, fake, stop_after_slot="B2")
+        ledger = load_json(ledger_behind / "ledger.json")
+        ledger["invocations"] = ledger["invocations"][:1]
+        (ledger_behind / "ledger.json").write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        marker = root / "ledger-behind-spawned.txt"
+        previous_marker = os.environ.get("FAKE_CLAUDE_MARKER")
+        os.environ["FAKE_CLAUDE_MARKER"] = str(marker)
+        try:
+            expect_proof_error("ledger behind immutable journal/raw evidence", lambda: run_packet(ledger_behind, DEFAULT_FIXTURE_DIR, fake))
+        finally:
+            if previous_marker is None:
+                os.environ.pop("FAKE_CLAUDE_MARKER", None)
+            else:
+                os.environ["FAKE_CLAUDE_MARKER"] = previous_marker
+        require(not marker.exists(), "ledger-behind-journal resume must fail before spawning fake Claude")
+        cases.append("ledger behind journal/raw resume fail-before-spawn")
 
     return {"runner_contract_cases": cases, "model_calls": 0}
 
