@@ -41,7 +41,7 @@ def align(rows, indent=""):
 
 ## Changelog
 
-- **A changelog entry is a one-line bookmark** — a very short summary of the completed task, not a re-explanation of it. The code is the documentation and the spec is the contract; the changelog only points to *what* changed. No rationale, implementation detail, or restated diff — those live in the code, the commit, and the spec.
+- **A changelog entry is a one-line bookmark** — a very short summary of the completed task, not a re-explanation of it. The code is the documentation and the spec is the contract; the changelog only points to *what* changed. No rationale, implementation detail, restated diff, or list of the files/symbols touched — those live in the code, the commit, and the spec.
 - **Expand only when it affects consumers** — a breaking or behaviour-changing release (e.g. a published crate's API) earns a short **warning + migration note** so downstream users know what to do. That is the one case where more than a line belongs.
 - **Structure follows [Keep a Changelog](https://keepachangelog.com)** — entries under `## [Unreleased]`, grouped by Added / Changed / Deprecated / Removed / Fixed / Security.
 
