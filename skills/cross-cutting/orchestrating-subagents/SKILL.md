@@ -69,6 +69,21 @@ The custom roles carry their own boundaries and the no-publish/no-attribution ru
 
 **Treat the tool *semantics* above as unverified** — who may write, what the user actually sees, what assigning an owner does are read from the shipped binary's tool definitions, not observed in a run; confirm them in practice and correct this section from what you observe. (The on-disk persistence just noted *is* observed — this session's lanes are real files on disk, not read from the tool schema.)
 
+## Stuck review / no-op-loop escalation
+
+A loop is only alive while its frontier changes. Track the frontier explicitly for every lane waiting on review: `review_card` (task/lane id + status), `active_pr` (number/url), `head_sha`, `reviewer_state` (none/requested/returned), `github_review_request` (absent/present/blocked), and the list of non-review-blocked implementation lanes. A new status message with the same frontier is **not progress**.
+
+**Material progress is one of:** a PR head SHA changes; a review request is created or a reviewer returns findings; a blocking status flips; an implementation lane lands code/tests; or the board gains one concrete blocker/need-help signal. Everything else is no-op monitoring and must not repeat.
+
+**Detect a stranded review lane** when all of these hold: the lane is `review-required` / `in-review` / blocked on review; an `active_pr` exists; the PR head is unchanged across two checks (or roughly 30 minutes, whichever is shorter); and no reviewer output has arrived. Before waiting again, do the escalation sequence below.
+
+1. **Request review once, not every loop.** If a named teammate reviewer is available, assign/send that reviewer the review goal. If the work is already on GitHub and a repo reviewer is known, inspect the PR first (`gh pr view <n> --json headRefOid,reviewRequests,latestReviews`) and request the reviewer only if missing (`gh pr edit <n> --add-reviewer <login>`). This is an outward PR action: if the guard asks or credentials are missing, stop there and surface that as the blocker instead of pretending the request happened. Record the requested reviewer and head SHA on the lane/card so the next loop can see it was done.
+2. **Escalate quickly on unchanged head.** On the next unchanged-head check after a reviewer has already been requested, escalate to El-Lee/default or the human operator with the exact signal `NEED HELP — review-stalled: PR #<n> head <sha> has no review after <duration>; reviewer=<login|none>; next safe work=<lane or none>`. Use the configured mailbox/board surface if present; otherwise put that line in the visible lane/card/blocker.
+3. **Block once, then stop repeating status.** Update the review lane/card to a blocker such as `review-stalled: waiting on <reviewer|human> for PR #<n> at <sha>; NEED HELP surfaced <timestamp>`. Do not keep posting heartbeats that say the same thing. Future loop iterations may re-read the frontier, but they only write again if something changes.
+4. **Keep unrelated work moving.** The `active_pr` guard blocks only work that would mutate the reviewed diff or invalidate the pending review. Continue any non-review-blocked implementation, research, planning, or board-cleanup lane in parallel instead of burning the whole loop on waiting.
+
+Never merge, deploy, mark a draft ready, activate a release, or run model-proof calls as part of this escalation without the normal gate. The escalation's job is to make stuckness visible and keep safe lanes moving, not to ship around the reviewer.
+
 **The named-teammate mailbox (`SendMessage`) — the coordination layer.** How you hand a running teammate its next goal or a mid-course correction, and how it reports back; you stay the sequencer. Let completion notifications drive the interleaving — don't poll.
 
 **Named = teammate; unnamed = one-shot — the `name` you pass to `Agent` is the lever** (not the tools it carries, not `run_in_background`; under Agent Teams every spawn is async either way). This is the distinction that used to leave agents idling:

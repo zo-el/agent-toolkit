@@ -1,0 +1,25 @@
+{
+  "slot": "B3",
+  "exit_status": 1,
+  "timed_out": false,
+  "budget_capped": true,
+  "stdout": "{\"is_error\":true,\"session_id\":\"sess-b3-capped\",\"total_cost_usd\":0.1870349,\"terminal_reason\":\"budget_exhausted\",\"subtype\":\"error_max_budget_usd\",\"errors\":[\"Reached maximum budget ($0.15)\"],\"type\":\"result\"}\n",
+  "stderr": "",
+  "wrapper": {
+    "is_error": true,
+    "session_id": "sess-b3-capped",
+    "total_cost_usd": 0.1870349,
+    "terminal_reason": "budget_exhausted",
+    "subtype": "error_max_budget_usd",
+    "errors": ["Reached maximum budget ($0.15)"],
+    "type": "result"
+  },
+  "result": null,
+  "metrics": {
+    "elapsed_ms": 88736,
+    "input_tokens": 2,
+    "output_tokens": 1083,
+    "turns": 4
+  },
+  "total_cost_usd": 0.1870349
+}

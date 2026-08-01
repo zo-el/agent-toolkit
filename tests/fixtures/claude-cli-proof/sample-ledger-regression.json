@@ -1,0 +1,39 @@
+{
+  "created_at": "2026-07-28T14:09:23Z",
+  "max_invocations": 10,
+  "source_sha": "<reviewed-head-sha>",
+  "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d",
+  "launch_controls": {
+    "neutral_cwd": "<fixture-dir>",
+    "timeout_seconds": 120,
+    "max_invocations": 10,
+    "no_retry": true,
+    "strict_empty_mcp": true,
+    "read_only_tools": [
+      "Read"
+    ],
+    "plan_permission_mode": true,
+    "project_setting_sources": true,
+    "source_sha": "<reviewed-head-sha>",
+    "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d",
+    "next_slot_requires_ledger_state": true,
+    "actual_resume_slots": {
+      "B5": "B4",
+      "C5": "C4"
+    }
+  },
+  "invocations": [
+    {
+      "slot": "B1",
+      "artifact": "artifacts/B1-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "C1",
+      "artifact": "artifacts/C1-regression.json",
+      "exit_status": 0,
+      "timed_out": false
+    }
+  ]
+}

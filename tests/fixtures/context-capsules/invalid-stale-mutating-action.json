@@ -1,0 +1,127 @@
+{
+  "schema_version": "context-capsule/v1",
+  "record_id": "cc_slice1_valid_platform",
+  "provenance": {
+    "task_tools": "present",
+    "capture_source": "TaskRead",
+    "captured_at": "2026-07-28T14:00:00Z",
+    "source_revision": "task-rev-7"
+  },
+  "platform_identity": {
+    "task_tool": "TaskCreate/TaskUpdate",
+    "platform_task_id": "task_abc123",
+    "platform_lane_id": "lane_002",
+    "source_session_id": "session_release_a_slice1",
+    "canonical_snapshot": {
+      "lane_subject": "#2 Build validator",
+      "status": "running",
+      "dependencies": [
+        {
+          "lane_number": 1,
+          "lane_label": "#1 Draft schema",
+          "platform_lane_id": "lane_001",
+          "relationship": "blockedBy"
+        }
+      ],
+      "owner": "developer",
+      "assignee": "developer",
+      "snapshot_at": "2026-07-28T14:00:00Z",
+      "source_revision": "task-rev-7"
+    }
+  },
+  "lane_identity": {
+    "lane_number": 2,
+    "lane_label": "#2 Build validator"
+  },
+  "lane_local": {
+    "facts": [
+      {
+        "statement": "Validator must reject supplemental owner/status/dependency overrides when task tools are present.",
+        "confidence": "high"
+      }
+    ],
+    "assumptions": [
+      {
+        "statement": "Task tools are present for this session.",
+        "confidence": "high",
+        "conflict_group": "task_tool_availability",
+        "status": "active"
+      }
+    ],
+    "decisions": [
+      {
+        "statement": "Implement semantic validation in a stdlib Python runner.",
+        "rationale": "The repo has no dependency manifest and tests already use shell plus stdlib Python.",
+        "uses_cross_lane_facts": true,
+        "cross_lane_refs": [
+          {
+            "source_lane": {
+              "lane_number": 1,
+              "lane_label": "#1 Draft schema",
+              "platform_lane_id": "lane_001"
+            },
+            "reason": "Schema lane defines the freshness-only canonical snapshot boundary.",
+            "evidence_refs": [
+              {
+                "kind": "path",
+                "ref": "orchestration/context-capsule.schema.json",
+                "captured_at": "2026-07-28T14:00:00Z",
+                "source_revision": "b7011ad"
+              }
+            ],
+            "confidence": "high"
+          }
+        ],
+        "evidence_refs": [
+          {
+            "kind": "path",
+            "ref": "tests/lanes/validate_context_capsules.py",
+            "captured_at": "2026-07-28T14:00:00Z",
+            "source_revision": "b7011ad"
+          }
+        ]
+      }
+    ],
+    "evidence": [
+      {
+        "kind": "command",
+        "ref": "python3 tests/lanes/validate_context_capsules.py tests/fixtures/context-capsules/valid-platform.json",
+        "captured_at": "2026-07-28T14:00:00Z",
+        "source_revision": "b7011ad",
+        "redacted": false
+      }
+    ],
+    "blockers": [],
+    "recovery_notes": [
+      {
+        "statement": "On resume, re-read platform task state for live owner/status/dependencies before using capsule supplements.",
+        "confidence": "high"
+      }
+    ],
+    "next_proposed_action": {
+      "summary": "Run validator fixtures and inspect negative rejections.",
+      "mutation_risk": "local",
+      "requires_fresh_platform_read": true,
+      "freshness_checked": false
+    }
+  },
+  "cross_lane_references": [
+    {
+      "source_lane": {
+        "lane_number": 1,
+        "lane_label": "#1 Draft schema",
+        "platform_lane_id": "lane_001"
+      },
+      "reason": "Use the schema lane as explicit provenance for validator decisions.",
+      "evidence_refs": [
+        {
+          "kind": "path",
+          "ref": "orchestration/context-capsule.schema.json",
+          "captured_at": "2026-07-28T14:00:00Z",
+          "source_revision": "b7011ad"
+        }
+      ],
+      "confidence": "high"
+    }
+  ]
+}

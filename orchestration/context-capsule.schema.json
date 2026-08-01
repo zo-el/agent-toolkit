@@ -1,0 +1,2359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zo-el/agent-toolkit/orchestration/context-capsule.schema.json",
+  "title": "Release A Slice 1 Platform-Keyed Context Capsule",
+  "description": "Supplemental lane-local context/provenance record keyed to a platform task/lane identity. Platform task tools remain canonical for live subject/status/dependencies/owner truth when present; this capsule may snapshot those fields only as freshness/evidence inputs. The stdlib validator in tests/lanes/validate_context_capsules.py enforces semantic invariants that JSON Schema cannot express portably.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "provenance",
+    "lane_identity",
+    "lane_local",
+    "cross_lane_references"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "context-capsule/v1"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^cc_[a-z0-9][a-z0-9_-]*$"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "platform_identity": {
+      "$ref": "#/$defs/platform_identity"
+    },
+    "fallback_identity": {
+      "$ref": "#/$defs/fallback_identity"
+    },
+    "lane_identity": {
+      "$ref": "#/$defs/lane_identity"
+    },
+    "lane_local": {
+      "$ref": "#/$defs/lane_local"
+    },
+    "cross_lane_references": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/cross_lane_reference"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_tools",
+        "capture_source",
+        "captured_at"
+      ],
+      "properties": {
+        "task_tools": {
+          "enum": [
+            "present",
+            "absent"
+          ]
+        },
+        "capture_source": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "platform_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_tool",
+        "platform_task_id",
+        "platform_lane_id",
+        "source_session_id",
+        "canonical_snapshot"
+      ],
+      "properties": {
+        "task_tool": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "platform_task_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "platform_lane_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "source_session_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "canonical_snapshot": {
+          "$ref": "#/$defs/canonical_snapshot"
+        }
+      }
+    },
+    "canonical_snapshot": {
+      "type": "object",
+      "description": "Freshness/evidence snapshot only; consumers must re-read platform task state for live truth when task tools are present.",
+      "additionalProperties": false,
+      "required": [
+        "lane_subject",
+        "status",
+        "dependencies",
+        "owner",
+        "snapshot_at",
+        "source_revision"
+      ],
+      "properties": {
+        "lane_subject": {
+          "type": "string",
+          "pattern": "^#[1-9][0-9]* .+"
+        },
+        "status": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lane_ref"
+          }
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshot_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "fallback_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fallback_lane_id",
+        "fallback_reason",
+        "reduced_fidelity",
+        "non_platform_persisted"
+      ],
+      "properties": {
+        "fallback_lane_id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "fallback_reason": {
+          "const": "task_tools_absent"
+        },
+        "reduced_fidelity": {
+          "const": true
+        },
+        "non_platform_persisted": {
+          "const": true
+        }
+      }
+    },
+    "lane_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_number",
+        "lane_label"
+      ],
+      "properties": {
+        "lane_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lane_label": {
+          "type": "string",
+          "pattern": "^#[1-9][0-9]* .+"
+        }
+      }
+    },
+    "lane_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_number",
+        "lane_label"
+      ],
+      "properties": {
+        "lane_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lane_label": {
+          "type": "string",
+          "pattern": "^#[1-9][0-9]* .+"
+        },
+        "platform_lane_id": {
+          "type": "string"
+        },
+        "relationship": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref",
+        "captured_at"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "path",
+            "url",
+            "command",
+            "artifact",
+            "platform_task",
+            "note"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "source_revision": {
+          "type": "string"
+        },
+        "redacted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "lane_local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facts",
+        "assumptions",
+        "decisions",
+        "evidence",
+        "blockers",
+        "recovery_notes",
+        "next_proposed_action"
+      ],
+      "properties": {
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/statement"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/assumption"
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/decision"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blocker"
+          }
+        },
+        "recovery_notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/statement"
+          }
+        },
+        "next_proposed_action": {
+          "$ref": "#/$defs/next_action"
+        }
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement",
+        "confidence"
+      ],
+      "properties": {
+        "statement": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement",
+        "confidence"
+      ],
+      "properties": {
+        "statement": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        },
+        "conflict_group": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "resolved",
+            "rejected"
+          ]
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement",
+        "rationale",
+        "uses_cross_lane_facts",
+        "evidence_refs"
+      ],
+      "properties": {
+        "statement": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "uses_cross_lane_facts": {
+          "type": "boolean"
+        },
+        "cross_lane_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cross_lane_reference"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "uses_cross_lane_facts": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "cross_lane_refs"
+            ],
+            "properties": {
+              "cross_lane_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "detail",
+        "raised_at"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "missing_context",
+            "stale_context",
+            "conflict",
+            "needs_platform_state",
+            "needs_human",
+            "capability"
+          ]
+        },
+        "detail": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "raised_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        }
+      }
+    },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "mutation_risk",
+        "requires_fresh_platform_read",
+        "freshness_checked"
+      ],
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "mutation_risk": {
+          "enum": [
+            "none",
+            "local",
+            "external"
+          ]
+        },
+        "requires_fresh_platform_read": {
+          "type": "boolean"
+        },
+        "freshness_checked": {
+          "type": "boolean"
+        },
+        "freshness_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "requires_fresh_platform_read": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "freshness_evidence_refs"
+            ],
+            "properties": {
+              "freshness_checked": {
+                "const": true
+              },
+              "freshness_evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cross_lane_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_lane",
+        "reason",
+        "evidence_refs",
+        "confidence"
+      ],
+      "properties": {
+        "source_lane": {
+          "$ref": "#/$defs/lane_ref"
+        },
+        "reason": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          },
+          "minItems": 1
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "task_tools": {
+                "const": "present"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "fallback_identity"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_local": {
+            "properties": {
+              "assumptions": {
+                "contains": {
+                  "properties": {
+                    "conflict_group": {
+                      "const": "task_tool_availability"
+                    },
+                    "status": {
+                      "const": "active"
+                    }
+                  },
+                  "required": [
+                    "conflict_group",
+                    "status"
+                  ]
+                },
+                "minContains": 2
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_local": {
+            "properties": {
+              "blockers": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 1
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#1 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#1 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 2
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#2 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#2 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 3
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#3 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#3 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 4
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#4 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#4 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 5
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#5 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#5 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 6
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#6 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#6 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 7
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#7 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#7 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 8
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#8 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#8 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 9
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#9 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#9 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 10
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#10 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#10 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 11
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#11 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#11 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 12
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#12 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#12 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 13
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#13 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#13 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 14
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#14 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#14 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 15
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#15 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#15 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 16
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#16 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#16 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 17
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#17 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#17 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 18
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#18 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#18 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 19
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#19 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#19 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 20
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#20 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#20 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 21
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#21 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#21 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 22
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#22 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#22 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 23
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#23 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#23 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 24
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#24 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#24 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 25
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#25 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#25 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 26
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#26 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#26 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 27
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#27 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#27 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 28
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#28 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#28 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 29
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#29 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#29 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 30
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#30 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#30 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 31
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#31 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#31 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 32
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#32 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#32 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 33
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#33 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#33 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 34
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#34 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#34 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 35
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#35 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#35 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 36
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#36 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#36 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 37
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#37 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#37 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 38
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#38 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#38 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 39
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#39 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#39 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 40
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#40 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#40 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 41
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#41 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#41 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 42
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#42 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#42 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 43
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#43 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#43 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 44
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#44 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#44 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 45
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#45 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#45 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 46
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#46 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#46 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 47
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#47 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#47 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 48
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#48 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#48 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 49
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#49 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#49 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_number": {
+                "const": 50
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "lane_identity": {
+            "properties": {
+              "lane_label": {
+                "pattern": "^#50 .+"
+              }
+            }
+          },
+          "platform_identity": {
+            "properties": {
+              "canonical_snapshot": {
+                "properties": {
+                  "lane_subject": {
+                    "pattern": "^#50 .+"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

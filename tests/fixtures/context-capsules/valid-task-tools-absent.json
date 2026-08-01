@@ -1,0 +1,64 @@
+{
+  "schema_version": "context-capsule/v1",
+  "record_id": "cc_slice1_valid_fallback",
+  "provenance": {
+    "task_tools": "absent",
+    "capture_source": "orchestrator_message",
+    "captured_at": "2026-07-28T14:05:00Z"
+  },
+  "fallback_identity": {
+    "fallback_lane_id": "fallback_lane_005",
+    "fallback_reason": "task_tools_absent",
+    "reduced_fidelity": true,
+    "non_platform_persisted": true
+  },
+  "lane_identity": {
+    "lane_number": 5,
+    "lane_label": "#5 Fallback record"
+  },
+  "lane_local": {
+    "facts": [
+      {
+        "statement": "Task tools are absent, so this record is a degraded local supplement only.",
+        "confidence": "high"
+      }
+    ],
+    "assumptions": [
+      {
+        "statement": "No platform lane persistence is available in this session.",
+        "confidence": "medium",
+        "conflict_group": "task_tool_availability",
+        "status": "active"
+      }
+    ],
+    "decisions": [
+      {
+        "statement": "Use fallback record only for user-visible continuity in this session.",
+        "rationale": "The record is explicitly non-platform-persisted and cannot be reconciled as canonical task truth.",
+        "uses_cross_lane_facts": false,
+        "evidence_refs": []
+      }
+    ],
+    "evidence": [],
+    "blockers": [
+      {
+        "kind": "needs_platform_state",
+        "detail": "Task tools absent; fidelity is reduced until platform lane state is available.",
+        "raised_at": "2026-07-28T14:05:00Z"
+      }
+    ],
+    "recovery_notes": [
+      {
+        "statement": "When task tools return, create/read a real platform lane and key future capsules to that identity instead of promoting this fallback id.",
+        "confidence": "high"
+      }
+    ],
+    "next_proposed_action": {
+      "summary": "Surface degraded fallback state to the user and avoid platform-truth claims.",
+      "mutation_risk": "none",
+      "requires_fresh_platform_read": false,
+      "freshness_checked": false
+    }
+  },
+  "cross_lane_references": []
+}

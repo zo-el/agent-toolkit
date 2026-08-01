@@ -34,6 +34,75 @@ file_case() { # $1 expected, $2 file_path
     "$2"
 }
 
+capsule_case() { # $1 expected(valid|invalid), $2 fixture path
+  local out got
+  if [ "$1" = invalid ]; then
+    out="$(python3 "$root/tests/lanes/validate_context_capsules.py" --expect-invalid "$root/$2" 2>&1)"
+  else
+    out="$(python3 "$root/tests/lanes/validate_context_capsules.py" "$root/$2" 2>&1)"
+  fi
+  if [ $? -eq 0 ]; then got="$1"; else got="fail"; fi
+  if [ "$got" = "$1" ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL context-capsule want=%-7s got=%-5s  %s\n%s\n' "$1" "$got" "$2" "$out"
+  fi
+}
+
+# ── context capsules: platform-keyed supplement, not task-lane truth ──
+capsule_case valid   'orchestration/examples/context-capsule.valid.json'
+capsule_case valid   'orchestration/examples/context-capsule.task-tools-absent.json'
+capsule_case valid   'tests/fixtures/context-capsules/valid-platform.json'
+capsule_case valid   'tests/fixtures/context-capsules/valid-task-tools-absent.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-mismatched-lane-number.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-missing-number-prefix.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-supplemental-status-override.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-cross-lane-without-provenance.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-stale-mutating-action.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-fallback-masquerade.json'
+capsule_case invalid 'tests/fixtures/context-capsules/invalid-conflicting-assumptions-without-blocker.json'
+
+proof_case() { # $1 label, remaining args command expected to exit 0
+  local label out
+  label="$1"; shift
+  out="$($@ 2>&1)"
+  if [ $? -eq 0 ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL claude-proof %-24s\n%s\n' "$label" "$out"
+  fi
+}
+proof_fail_case() { # $1 label, remaining args command expected to exit nonzero
+  local label out
+  label="$1"; shift
+  out="$($@ 2>&1)"
+  if [ $? -ne 0 ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL claude-proof %-24s unexpectedly passed\n%s\n' "$label" "$out"
+  fi
+}
+proof_case context-capsule-schema python3 "$root/tests/lanes/validate_context_capsule_schema.py"
+proof_case fixture-breadth python3 "$root/tests/proof/claude_cli_proof.py" validate-fixtures
+proof_case stdin-command-shape python3 "$root/tests/proof/claude_cli_proof.py" build-command B1
+proof_fail_case resume-required python3 "$root/tests/proof/claude_cli_proof.py" build-command B5
+proof_case resume-command-shape python3 "$root/tests/proof/claude_cli_proof.py" build-command B5 --resume-id sess-b4
+proof_case failed-slot-preserved python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-failed-slot.json"
+proof_case oracle-self-check-contract python3 "$root/tests/proof/claude_cli_proof.py" validate-oracle-contract
+proof_case budget-capped-wrapper python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-budget-capped-wrapper.json"
+proof_case matched-pair-comparison python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-matched-pair.json"
+proof_case actual-resume-ledger python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-actual-resume.json"
+proof_case regression-recorded python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-regression.json"
+proof_fail_case evidence-not-complete python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-failed-slot.json"
+proof_fail_case legacy-proof-complete-informal python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete.json"
+proof_fail_case omitted-attempt-history python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete-omitted-attempt.json"
+proof_fail_case unknown-attempt-history python3 "$root/tests/proof/claude_cli_proof.py" validate-proof-complete "$root/tests/fixtures/claude-cli-proof/sample-ledger-proof-complete-unknown-history.json"
+proof_fail_case unsafe-launch-controls python3 "$root/tests/proof/claude_cli_proof.py" validate-ledger "$root/tests/fixtures/claude-cli-proof/sample-ledger-unsafe-launch-controls.json"
+proof_case immutable-runner-contract python3 "$root/tests/proof/claude_cli_proof.py" validate-runner-contract
+
 # ── guard-git: deny — public words as the user, never allowed ──
 bash_case deny 'gh pr comment 5 --body "looks good"'
 bash_case deny 'gh issue comment 3 --body "fixed"'
@@ -816,6 +885,23 @@ if printf '%s' "$out_to"     | grep -q '⬡ v50·abc1234' \
   fail=$((fail + 1)); echo "FAIL statusline.py  freshness must show '?' on git timeout/error and clean only on a verified match (timeout=$out_to fresh=$out_fresh2)"
 fi
 rm -rf "$fh"
+
+# ── orchestration contract: stuck reviews escalate instead of no-op looping ──
+doc_contract() { # $1 file, $2 literal phrase, $3 label
+  if grep -Fq "$2" "$root/$1"; then pass=$((pass + 1)); else
+    fail=$((fail + 1)); printf 'FAIL docs-contract %-24s missing: %s\n' "$3" "$2"
+  fi
+}
+orch='skills/cross-cutting/orchestrating-subagents/SKILL.md'
+doc_contract "$orch" '## Stuck review / no-op-loop escalation' 'stuck-review-section'
+doc_contract "$orch" 'Track the frontier explicitly'              'frontier-tracking'
+doc_contract "$orch" 'same frontier is **not progress**'           'no-op-is-not-progress'
+doc_contract "$orch" 'review request is created'                   'material-progress'
+doc_contract "$orch" 'Detect a stranded review lane'                'stranded-review-detect'
+doc_contract "$orch" 'gh pr edit <n> --add-reviewer <login>'        'github-review-request'
+doc_contract "$orch" 'NEED HELP — review-stalled'                   'need-help-signal'
+doc_contract "$orch" 'Continue any non-review-blocked implementation' 'parallel-safe-work'
+doc_contract "$orch" 'Never merge, deploy, mark a draft ready, activate a release, or run model-proof calls' 'forbidden-actions-gated'
 
 echo "────────────────────────────────"
 echo "pass: $pass  fail: $fail"

@@ -1,0 +1,186 @@
+{
+  "created_at": "2026-07-28T14:09:23Z",
+  "max_invocations": 10,
+  "source_sha": "<reviewed-head-sha>",
+  "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d",
+  "launch_controls": {
+    "neutral_cwd": "<fixture-dir>",
+    "timeout_seconds": 120,
+    "max_invocations": 10,
+    "no_retry": true,
+    "strict_empty_mcp": true,
+    "read_only_tools": [
+      "Read"
+    ],
+    "plan_permission_mode": true,
+    "project_setting_sources": true,
+    "source_sha": "<reviewed-head-sha>",
+    "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d",
+    "next_slot_requires_ledger_state": true,
+    "actual_resume_slots": {
+      "B5": "B4",
+      "C5": "C4"
+    }
+  },
+  "invocations": [
+    {
+      "slot": "B1",
+      "artifact": "artifacts/B1-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "B2",
+      "artifact": "artifacts/B2-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "B3",
+      "artifact": "artifacts/B3-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "B4",
+      "artifact": "artifacts/B4-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "B5",
+      "artifact": "artifacts/B5-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "resume_from_session_id": "sess-b4",
+      "command": {
+        "argv": [
+          "claude",
+          "--print",
+          "--strict-mcp-config",
+          "--resume",
+          "sess-b4",
+          "--add-dir",
+          "<fixture-dir>"
+        ]
+      }
+    },
+    {
+      "slot": "C1",
+      "artifact": "artifacts/C1-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "C2",
+      "artifact": "artifacts/C2-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "C3",
+      "artifact": "artifacts/C3-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "C4",
+      "artifact": "artifacts/C4-ok.json",
+      "exit_status": 0,
+      "timed_out": false
+    },
+    {
+      "slot": "C5",
+      "artifact": "artifacts/C5-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "resume_from_session_id": "sess-c4",
+      "command": {
+        "argv": [
+          "claude",
+          "--print",
+          "--strict-mcp-config",
+          "--resume",
+          "sess-c4",
+          "--add-dir",
+          "<fixture-dir>"
+        ]
+      }
+    }
+  ],
+  "append_only_attempts": [
+    {
+      "attempt_index": 1,
+      "slot": "B1",
+      "artifact": "artifacts/B1-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 2,
+      "slot": "B2",
+      "artifact": "artifacts/B2-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 3,
+      "slot": "B3",
+      "artifact": "artifacts/B3-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 4,
+      "slot": "B4",
+      "artifact": "artifacts/B4-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 5,
+      "slot": "B5",
+      "artifact": "artifacts/B5-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 6,
+      "slot": "C1",
+      "artifact": "artifacts/C1-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 7,
+      "slot": "C2",
+      "artifact": "artifacts/C2-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 8,
+      "slot": "C3",
+      "artifact": "artifacts/C3-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    },
+    {
+      "attempt_index": 9,
+      "slot": "C4",
+      "artifact": "artifacts/C4-ok.json",
+      "exit_status": 0,
+      "timed_out": false,
+      "budget_capped": false
+    }
+  ],
+  "append_only_attempts_digest": "a74592917a378077092a8497817df8b650a56e4e54ef8d435ce9dfa8f6e92e3a"
+}

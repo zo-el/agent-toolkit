@@ -1,0 +1,19 @@
+{
+  "exit_status": 0,
+  "timed_out": false,
+  "metrics": {"input_tokens": 140, "output_tokens": 70, "turns": 1, "tool_calls": 2, "elapsed_ms": 1250},
+  "result": {
+    "slot": "C5",
+    "session_id": "sess-c5",
+    "scenarios": ["actual_resume"],
+    "selected_context": ["platform_state", "capsules"],
+    "excluded_context": ["capsule owner/status/dependency overrides"],
+    "decisions": [{"statement": "platform_state remains live truth; capsule supplements cannot restore owner/status/dependencies."}],
+    "provenance": [{"ref": "platform_state"}, {"ref": "capsules"}],
+    "blocks": [],
+    "recovery_view": {"live_truth_from": "platform_state", "supplements_from": "capsule records"},
+    "fallback": {},
+    "oracle_self_check": {"passed": true},
+    "summary": "Resumed from C4 and reconstructed live platform truth with capsule supplements only."
+  }
+}

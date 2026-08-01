@@ -1,0 +1,111 @@
+{
+  "source_sha": "<reviewed-head-sha>",
+  "max_invocations": 10,
+  "required_controls": [
+    "--print",
+    "--model",
+    "--max-budget-usd",
+    "--tools",
+    "--permission-mode",
+    "--setting-sources",
+    "--output-format",
+    "--json-schema",
+    "--mcp-config",
+    "--strict-mcp-config"
+  ],
+  "scenarios": {
+    "B1": {
+      "covers": [
+        "single_lane",
+        "final_output_quality"
+      ],
+      "target_lane": "#2 Build context capsule schema",
+      "oracle": {
+        "must_select": [
+          "cap_2",
+          "pl_2",
+          "f2",
+          "e2"
+        ],
+        "must_exclude": [
+          "cap_1.f1",
+          "cap_3.f3"
+        ],
+        "must_block": false
+      }
+    },
+    "B2": {
+      "covers": [
+        "two_independent_lanes"
+      ],
+      "target_lanes": [
+        "#1 Verify Claude CLI proof gate",
+        "#3 Review release gate evidence"
+      ],
+      "oracle": {
+        "must_keep_separate": true,
+        "forbid_cross_lane_leakage": true
+      }
+    },
+    "B3": {
+      "covers": [
+        "related_lanes",
+        "conflicting_assumptions"
+      ],
+      "target_lane": "#2 Build context capsule schema",
+      "oracle": {
+        "allowed_cross_lane_refs": [
+          "cap_1.f1"
+        ],
+        "must_cite_relevance": true,
+        "must_surface_conflict": true
+      }
+    },
+    "B4": {
+      "covers": [
+        "stale_context",
+        "task_tools_absent_fallback",
+        "resume_seed"
+      ],
+      "oracle": {
+        "must_reject_stale_without_revision_check": true,
+        "fallback_labels": [
+          "task_tools_absent",
+          "reduced_fidelity",
+          "non_platform_persisted"
+        ],
+        "must_record_session_handle": true
+      }
+    },
+    "B5": {
+      "covers": [
+        "actual_resume"
+      ],
+      "oracle": {
+        "must_use_resume": true,
+        "live_truth_from": "platform_state",
+        "supplements_from": "capsules",
+        "forbid_capsule_owner_status_dependency_restore": true
+      }
+    }
+  },
+  "launch_controls": {
+    "neutral_cwd": "<fixture-dir>",
+    "timeout_seconds": 120,
+    "max_invocations": 10,
+    "no_retry": true,
+    "strict_empty_mcp": true,
+    "read_only_tools": [
+      "Read"
+    ],
+    "plan_permission_mode": true,
+    "project_setting_sources": true,
+    "source_sha": "<reviewed-head-sha>",
+    "next_slot_requires_ledger_state": true,
+    "actual_resume_slots": {
+      "B5": "B4",
+      "C5": "C4"
+    },
+    "fixture_revision": "d904a07537b7d1b9a547f266061760ca3e919cacf7559434ebb42b7a88a7be4d"
+  }
+}
